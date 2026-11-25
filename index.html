@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CABGCU Database</title>
-    <!-- Load Tailwind CSS for responsive utility styling -->
+    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load Inter font for clean, modern typography -->
+    <!-- Load Inter font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
@@ -24,1070 +24,997 @@
 </head>
 <body class="bg-black text-slate-100 font-sans antialiased overflow-x-hidden min-h-screen flex flex-col justify-between selection:bg-sky-500/30 selection:text-sky-200">
 
-    <!-- Top Navigation / Status Header -->
-    <header class="relative z-20 w-full max-w-6xl mx-auto px-4 sm:px-6 pt-5 pb-2 flex items-center justify-between">
+    <!-- Minimal Top Header -->
+    <header class="relative z-20 w-full max-w-4xl mx-auto px-5 pt-6 pb-2 flex items-center justify-between">
         <div class="flex items-center gap-3">
-            <div class="w-3 h-3 rounded-full bg-sky-400 shadow-[0_0_12px_rgba(56,189,248,0.9)] animate-pulse"></div>
+            <span id="global-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.9)] animate-pulse"></span>
             <div>
-                <h1 class="text-sm sm:text-base font-semibold tracking-wider uppercase text-sky-100">CABGCU Database</h1>
-                <p id="status-subtitle" class="text-xs text-sky-400/80 font-medium">Database Ready • Idle Mode</p>
+                <h1 class="text-sm font-semibold tracking-[0.16em] uppercase text-sky-100">CABGCU Database</h1>
+                <p id="global-status" class="text-xs text-slate-400">AI Security Agent • 1 Brevo Flag Active</p>
             </div>
         </div>
 
-        <div class="flex items-center gap-2 sm:gap-3">
-            <!-- Audio Synth Toggle -->
-            <button id="btn-sound" type="button" aria-label="Toggle UI Sound Effects"
-                class="p-2.5 sm:px-3.5 sm:py-2 rounded-xl bg-black/80 hover:bg-zinc-900/90 border border-sky-500/20 text-sky-300 text-xs font-medium transition-all flex items-center gap-2 backdrop-blur-md active:scale-95">
-                <svg id="icon-sound-off" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <div class="flex items-center gap-2">
+            <!-- Toggle Activity Log Drawer -->
+            <button id="btn-log-toggle" type="button"
+                class="px-3 py-2 rounded-xl bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-slate-300 hover:text-sky-200 text-xs font-medium transition-all flex items-center gap-1.5 active:scale-95">
+                <span>Activity</span>
+                <span id="log-count" class="px-1.5 py-0.5 rounded-md bg-sky-500/15 text-sky-300 font-mono text-[10px]">3</span>
+            </button>
+
+            <!-- Minimal Audio Toggle -->
+            <button id="btn-sound" type="button" aria-label="Toggle Audio"
+                class="p-2 rounded-xl bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-slate-400 hover:text-sky-300 transition-all active:scale-95">
+                <svg id="icon-sound-off" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
                     <path stroke-linecap="round" stroke-linejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
                 </svg>
-                <svg id="icon-sound-on" class="w-4 h-4 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <svg id="icon-sound-on" class="w-4 h-4 hidden text-sky-300" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
                 </svg>
-                <span class="hidden sm:inline" id="sound-label">Audio Off</span>
-            </button>
-
-            <!-- Settings Drawer Toggle -->
-            <button id="btn-settings" type="button" aria-label="Toggle Orb Controls"
-                class="p-2.5 sm:px-3.5 sm:py-2 rounded-xl bg-black/80 hover:bg-zinc-900/90 border border-sky-500/20 text-sky-300 text-xs font-medium transition-all flex items-center gap-2 backdrop-blur-md active:scale-95">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                </svg>
-                <span class="hidden sm:inline">Tune Orb</span>
             </button>
         </div>
     </header>
 
-    <!-- Non-blocking Toast / Message Box -->
+    <!-- Subtle Non-Blocking Toast -->
     <div id="toast-box" class="fixed top-20 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-opacity duration-300">
-        <div class="px-4 py-2 rounded-full bg-sky-950/90 border border-sky-400/40 text-sky-100 text-xs sm:text-sm font-medium shadow-[0_0_20px_rgba(14,165,233,0.3)] backdrop-blur-md">
-            <span id="toast-message">Orb Pulse Triggered</span>
+        <div class="px-4 py-1.5 rounded-full bg-zinc-950/95 border border-sky-400/35 text-sky-100 text-xs font-medium shadow-[0_0_24px_rgba(14,165,233,0.25)] backdrop-blur-md">
+            <span id="toast-message">Scan Complete</span>
         </div>
     </div>
 
-    <!-- Main Interactive Blue Orb Stage -->
-    <main class="relative flex-1 flex flex-col items-center justify-center w-full px-4 my-2">
-        <!-- Responsive Canvas Container with Precision Telemetry Overlays -->
-        <div id="orb-stage" class="relative w-full max-w-3xl h-[50vh] min-h-[320px] max-h-[560px] flex items-center justify-center cursor-pointer select-none touch-none">
+    <!-- Centerpiece: Storytelling Interactive Orb -->
+    <main class="relative flex-1 flex flex-col items-center justify-center w-full max-w-4xl mx-auto px-4 py-2">
+        <!-- Responsive Orb Canvas -->
+        <div id="orb-stage" class="relative w-full h-[46vh] min-h-[300px] max-h-[480px] flex items-center justify-center cursor-pointer select-none touch-none">
             <canvas id="orb-canvas" class="w-full h-full block"></canvas>
 
-            <!-- Top-Left Telemetry Readout -->
-            <div class="hud-overlay pointer-events-none absolute top-2 left-2 sm:left-4 flex flex-col gap-1 px-3 py-2 rounded-xl bg-black/70 border border-sky-500/20 backdrop-blur-md text-[10px] sm:text-xs font-mono">
-                <div class="flex items-center gap-2 text-sky-400/80 uppercase tracking-wider">
-                    <span class="w-1.5 h-1.5 rounded-full bg-sky-400 animate-ping"></span>
-                    <span>Harmonic Freq</span>
-                </div>
-                <div class="text-sky-100 font-semibold text-xs sm:text-sm"><span id="metric-freq">432.0</span> <span class="text-sky-400/70 text-[10px]">Hz</span></div>
-                <div class="text-slate-400 text-[10px]">Flux: <span id="metric-flux" class="text-sky-300">99.4%</span></div>
-            </div>
-
-            <!-- Top-Right Telemetry Readout -->
-            <div class="hud-overlay pointer-events-none absolute top-2 right-2 sm:right-4 flex flex-col items-end gap-1 px-3 py-2 rounded-xl bg-black/70 border border-sky-500/20 backdrop-blur-md text-[10px] sm:text-xs font-mono">
-                <div class="text-sky-400/80 uppercase tracking-wider">Core Matrix</div>
-                <div class="text-sky-100 font-semibold text-xs sm:text-sm"><span id="metric-temp">318.4</span> <span class="text-sky-400/70 text-[10px]">K</span></div>
-                <div class="text-slate-400 text-[10px]">Load: <span id="metric-load" class="text-sky-300">14%</span></div>
-            </div>
-
-            <!-- Subtle Center Hint Overlay (fades out after first interaction) -->
-            <div id="orb-hint" class="pointer-events-none absolute bottom-2 px-3 py-1 rounded-full bg-black/70 border border-sky-500/20 text-[11px] text-sky-300/80 backdrop-blur-sm transition-opacity duration-500">
-                Tap to pulse • Hold to charge • Move pointer to bend field
+            <!-- Subtle Bottom Hint (fades after interaction) -->
+            <div id="orb-hint" class="pointer-events-none absolute bottom-1 px-3 py-1 rounded-full bg-black/70 border border-zinc-800/80 text-[11px] text-slate-400 backdrop-blur-sm transition-opacity duration-500">
+                Tap orb to scan • Select a system below to focus
             </div>
         </div>
 
-        <!-- Live Assistant / Telemetry Transcript -->
-        <div class="relative z-20 w-full max-w-xl text-center mt-2 px-2">
-            <p id="orb-response" class="text-sm sm:text-base text-sky-100/90 font-light tracking-wide min-h-[2.5rem] transition-all duration-300">
-                "CABGCU Database online. Select a mode below or submit a query."
+        <!-- AI Agent Narrative Line (Tells the current visual story) -->
+        <div class="w-full max-w-xl text-center mt-1 mb-5 px-2">
+            <p id="story-headline" class="text-sm sm:text-base text-sky-100/95 font-light leading-relaxed min-h-[2.5rem] transition-opacity duration-300">
+                "Monitoring all systems. Traffic and Supabase are healthy, while 1 suspicious outbound email is flagged in Brevo."
             </p>
         </div>
 
-        <!-- Collapsible Customization Panel -->
-        <aside id="settings-panel" class="hidden relative z-30 w-full max-w-2xl mt-3 p-4 sm:p-5 rounded-2xl bg-zinc-950/90 border border-sky-500/25 shadow-[0_0_30px_rgba(2,132,199,0.2)] backdrop-blur-xl">
-            <div class="flex items-center justify-between mb-3">
-                <h2 class="text-xs font-semibold uppercase tracking-wider text-sky-300">Plasma Core Parameters</h2>
-                <div class="flex items-center gap-3">
-                    <label class="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer select-none">
-                        <input id="toggle-hud" type="checkbox" checked class="accent-sky-400 rounded cursor-pointer">
-                        <span>HUD Details</span>
-                    </label>
-                    <button id="btn-reset-params" type="button" class="text-xs text-slate-400 hover:text-sky-300 transition-colors">Reset Defaults</button>
+        <!-- 4 Clean Focus Pills (Overview, Traffic, Brevo, Supabase) -->
+        <nav aria-label="System Focus" class="w-full max-w-xl grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+            <button type="button" data-focus="overview"
+                class="focus-btn p-3 rounded-2xl border transition-all text-left active:scale-95 bg-sky-500/15 border-sky-400/40 text-sky-100">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] uppercase tracking-wider font-medium text-sky-300">Overview</span>
+                    <span id="dot-overview" class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                </div>
+                <div id="pill-overview" class="text-xs font-mono text-slate-200 mt-1">3 Systems</div>
+            </button>
+
+            <button type="button" data-focus="traffic"
+                class="focus-btn p-3 rounded-2xl border transition-all text-left active:scale-95 bg-zinc-950/90 border-zinc-800/90 text-slate-300 hover:border-zinc-700">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] uppercase tracking-wider font-medium text-slate-400">Traffic</span>
+                    <span id="dot-traffic" class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                </div>
+                <div id="pill-traffic" class="text-xs font-mono text-slate-200 mt-1">1.8 / 0.9 MB/s</div>
+            </button>
+
+            <button type="button" data-focus="brevo"
+                class="focus-btn p-3 rounded-2xl border transition-all text-left active:scale-95 bg-zinc-950/90 border-amber-500/35 text-slate-300 hover:border-amber-400/60">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] uppercase tracking-wider font-medium text-amber-300">Brevo</span>
+                    <span id="dot-brevo" class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span>
+                </div>
+                <div id="pill-brevo" class="text-xs font-mono text-amber-200 mt-1">1 Flagged</div>
+            </button>
+
+            <button type="button" data-focus="supabase"
+                class="focus-btn p-3 rounded-2xl border transition-all text-left active:scale-95 bg-zinc-950/90 border-zinc-800/90 text-slate-300 hover:border-zinc-700">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] uppercase tracking-wider font-medium text-slate-400">Supabase</span>
+                    <span id="dot-supabase" class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                </div>
+                <div id="pill-supabase" class="text-xs font-mono text-slate-200 mt-1">38% Quota</div>
+            </button>
+        </nav>
+
+        <!-- Single Context-Aware Detail Strip (Only shows what you're focused on) -->
+        <section id="detail-strip" class="w-full max-w-xl p-4 rounded-2xl bg-zinc-950/90 border border-zinc-800/90 backdrop-blur-xl transition-all">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div id="detail-metrics" class="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-mono">
+                    <!-- Dynamically populated based on active focus -->
+                </div>
+                <div id="detail-actions" class="flex items-center gap-2">
+                    <!-- Dynamically populated quick action -->
                 </div>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <!-- Glow Intensity Slider -->
-                <div class="flex flex-col gap-1.5">
-                    <div class="flex justify-between text-xs text-slate-300">
-                        <label for="slider-intensity">Luminosity</label>
-                        <span id="val-intensity" class="text-sky-400 font-mono">100%</span>
-                    </div>
-                    <input id="slider-intensity" type="range" min="40" max="150" value="100"
-                        class="w-full accent-sky-400 bg-slate-800 rounded-lg cursor-pointer h-2">
-                </div>
+        </section>
 
-                <!-- Turbulence / Speed Slider -->
-                <div class="flex flex-col gap-1.5">
-                    <div class="flex justify-between text-xs text-slate-300">
-                        <label for="slider-speed">Energy Flow</label>
-                        <span id="val-speed" class="text-sky-400 font-mono">1.0x</span>
-                    </div>
-                    <input id="slider-speed" type="range" min="30" max="250" value="100"
-                        class="w-full accent-sky-400 bg-slate-800 rounded-lg cursor-pointer h-2">
+        <!-- Expandable Minimal Activity Log (Hidden by default for clean canvas) -->
+        <aside id="activity-drawer" class="hidden w-full max-w-xl mt-3 p-4 rounded-2xl bg-zinc-950/95 border border-zinc-800 backdrop-blur-xl">
+            <div class="flex items-center justify-between pb-2.5 mb-2.5 border-b border-zinc-800/80">
+                <span class="text-xs font-medium uppercase tracking-wider text-sky-200">AI Security Log</span>
+                <div class="flex items-center gap-2">
+                    <button id="btn-sim-alert" type="button" class="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-[11px] transition-all active:scale-95">Simulate Alert</button>
+                    <button id="btn-clear-flags" type="button" class="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-[11px] transition-all active:scale-95">Clear Flags</button>
                 </div>
-
-                <!-- Hue Shift Slider (Deep Cobalt to Ice Cyan) -->
-                <div class="flex flex-col gap-1.5">
-                    <div class="flex justify-between text-xs text-slate-300">
-                        <label for="slider-hue">Blue Spectrum</label>
-                        <span id="val-hue" class="text-sky-400 font-mono">205°</span>
-                    </div>
-                    <input id="slider-hue" type="range" min="185" max="235" value="205"
-                        class="w-full accent-sky-400 bg-slate-800 rounded-lg cursor-pointer h-2">
-                </div>
-
-                <!-- Plasma Arc & Detail Density Slider -->
-                <div class="flex flex-col gap-1.5">
-                    <div class="flex justify-between text-xs text-slate-300">
-                        <label for="slider-detail">Arc & Lattice</label>
-                        <span id="val-detail" class="text-sky-400 font-mono">100%</span>
-                    </div>
-                    <input id="slider-detail" type="range" min="0" max="150" value="100"
-                        class="w-full accent-sky-400 bg-slate-800 rounded-lg cursor-pointer h-2">
-                </div>
+            </div>
+            <div id="log-list" class="max-h-36 overflow-y-auto space-y-2 font-mono text-[11px] pr-1">
+                <!-- Populated dynamically -->
             </div>
         </aside>
     </main>
 
-    <!-- Bottom Interactive Dock -->
-    <footer class="relative z-20 w-full max-w-2xl mx-auto px-4 pb-6 pt-2 flex flex-col gap-3">
-        <!-- State Selector Buttons -->
-        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 p-2 rounded-2xl bg-zinc-950/80 border border-sky-500/20 backdrop-blur-xl shadow-lg">
-            <button data-mode="idle" type="button"
-                class="mode-btn p-3 rounded-xl text-xs sm:text-sm font-medium transition-all active:scale-95 bg-sky-500/25 text-sky-200 border border-sky-400/40 shadow-[0_0_15px_rgba(56,189,248,0.2)]">
-                Idle
-            </button>
-            <button data-mode="listening" type="button"
-                class="mode-btn p-3 rounded-xl text-xs sm:text-sm font-medium transition-all active:scale-95 bg-zinc-900/70 text-slate-300 hover:bg-zinc-800 border border-transparent">
-                Listening
-            </button>
-            <button data-mode="thinking" type="button"
-                class="mode-btn p-3 rounded-xl text-xs sm:text-sm font-medium transition-all active:scale-95 bg-zinc-900/70 text-slate-300 hover:bg-zinc-800 border border-transparent">
-                Thinking
-            </button>
-            <button data-mode="speaking" type="button"
-                class="mode-btn p-3 rounded-xl text-xs sm:text-sm font-medium transition-all active:scale-95 bg-zinc-900/70 text-slate-300 hover:bg-zinc-800 border border-transparent">
-                Speaking
-            </button>
-            <button id="btn-pulse" type="button"
-                class="col-span-2 sm:col-span-1 p-3 rounded-xl text-xs sm:text-sm font-semibold transition-all active:scale-95 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white shadow-[0_0_18px_rgba(14,165,233,0.45)]">
-                Pulse
-            </button>
-        </div>
-
-        <!-- Simulated Command Input Bar -->
-        <form id="command-form" class="flex items-center gap-2 p-1.5 rounded-2xl bg-zinc-950/85 border border-sky-500/20 focus-within:border-sky-400/60 focus-within:shadow-[0_0_20px_rgba(56,189,248,0.2)] transition-all backdrop-blur-xl">
-            <input id="command-input" type="text" autocomplete="off" placeholder="Query the CABGCU Database..."
-                class="flex-1 bg-transparent px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-400 focus:outline-none">
+    <!-- Minimal Bottom AI Command Bar -->
+    <footer class="relative z-20 w-full max-w-xl mx-auto px-4 pb-6 pt-2">
+        <form id="command-form" class="flex items-center gap-2 p-1.5 rounded-2xl bg-zinc-950/90 border border-zinc-800 focus-within:border-sky-400/50 focus-within:shadow-[0_0_24px_rgba(56,189,248,0.16)] transition-all backdrop-blur-xl">
+            <input id="command-input" type="text" autocomplete="off"
+                placeholder="Ask CABGCU Agent (e.g. 'check brevo', 'traffic', 'supabase', 'scan')..."
+                class="flex-1 bg-transparent px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none">
             <button type="submit"
-                class="px-4 py-2.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/30 text-sky-200 text-xs sm:text-sm font-medium transition-all active:scale-95">
-                Transmit
+                class="px-4 py-2.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/30 text-sky-200 text-xs font-medium transition-all active:scale-95">
+                Ask
             </button>
         </form>
     </footer>
 
-    <!-- Core Blue Orb Graphics & Interaction Logic (JavaScript) -->
+    <!-- Interactive Storytelling Orb & Security Hub Logic -->
     <script>
         (function () {
             'use strict';
 
-            // Core DOM References
+            // DOM Elements
             const canvas = document.getElementById('orb-canvas');
             const ctx = canvas.getContext('2d');
             const stage = document.getElementById('orb-stage');
-            const statusSubtitle = document.getElementById('status-subtitle');
-            const orbResponse = document.getElementById('orb-response');
+            const globalDot = document.getElementById('global-dot');
+            const globalStatus = document.getElementById('global-status');
+            const storyHeadline = document.getElementById('story-headline');
             const orbHint = document.getElementById('orb-hint');
-            const settingsPanel = document.getElementById('settings-panel');
-            const modeButtons = document.querySelectorAll('.mode-btn');
-            const pulseButton = document.getElementById('btn-pulse');
-            const settingsButton = document.getElementById('btn-settings');
-            const soundButton = document.getElementById('btn-sound');
+            const focusButtons = document.querySelectorAll('.focus-btn');
+            const detailMetrics = document.getElementById('detail-metrics');
+            const detailActions = document.getElementById('detail-actions');
+            const activityDrawer = document.getElementById('activity-drawer');
+            const logToggleBtn = document.getElementById('btn-log-toggle');
+            const logCountEl = document.getElementById('log-count');
+            const logListEl = document.getElementById('log-list');
+            const simAlertBtn = document.getElementById('btn-sim-alert');
+            const clearFlagsBtn = document.getElementById('btn-clear-flags');
+            const soundBtn = document.getElementById('btn-sound');
             const iconSoundOff = document.getElementById('icon-sound-off');
             const iconSoundOn = document.getElementById('icon-sound-on');
-            const soundLabel = document.getElementById('sound-label');
-            const resetParamsButton = document.getElementById('btn-reset-params');
             const commandForm = document.getElementById('command-form');
             const commandInput = document.getElementById('command-input');
             const toastBox = document.getElementById('toast-box');
             const toastMessage = document.getElementById('toast-message');
 
-            // Sliders & Telemetry Readouts
-            const sliderIntensity = document.getElementById('slider-intensity');
-            const sliderSpeed = document.getElementById('slider-speed');
-            const sliderHue = document.getElementById('slider-hue');
-            const sliderDetail = document.getElementById('slider-detail');
-            const toggleHud = document.getElementById('toggle-hud');
-            const hudOverlays = document.querySelectorAll('.hud-overlay');
-            const valIntensity = document.getElementById('val-intensity');
-            const valSpeed = document.getElementById('val-speed');
-            const valHue = document.getElementById('val-hue');
-            const valDetail = document.getElementById('val-detail');
+            // Pill status elements
+            const pillOverview = document.getElementById('pill-overview');
+            const pillTraffic = document.getElementById('pill-traffic');
+            const pillBrevo = document.getElementById('pill-brevo');
+            const pillSupabase = document.getElementById('pill-supabase');
+            const dotOverview = document.getElementById('dot-overview');
+            const dotTraffic = document.getElementById('dot-traffic');
+            const dotBrevo = document.getElementById('dot-brevo');
+            const dotSupabase = document.getElementById('dot-supabase');
 
-            const metricFreq = document.getElementById('metric-freq');
-            const metricFlux = document.getElementById('metric-flux');
-            const metricTemp = document.getElementById('metric-temp');
-            const metricLoad = document.getElementById('metric-load');
-
-            // Application State
-            const state = {
-                mode: 'idle', // 'idle' | 'listening' | 'thinking' | 'speaking'
+            // Visual & Animation State
+            const orb = {
                 width: 0,
                 height: 0,
                 cx: 0,
                 cy: 0,
-                baseRadius: 100,
+                baseRadius: 110,
                 time: 0,
-                frameCount: 0,
-                // Smoothly interpolated animation parameters
-                currentSpeed: 1.0,
-                targetSpeed: 1.0,
-                currentTurbulence: 0.14,
-                targetTurbulence: 0.14,
-                currentScale: 1.0,
-                targetScale: 1.0,
-                // User-tunable parameters
-                intensity: 1.0,
-                speedMultiplier: 1.0,
+                frame: 0,
+                // Story focus: 'overview' | 'traffic' | 'brevo' | 'supabase'
+                focus: 'overview',
+                isScanning: false,
+                scanAngle: 0,
+                // Smoothly interpolated visual traits
                 hue: 205,
-                detailLevel: 1.0,
-                showHud: true,
-                // Pointer tracking & Hold-to-Charge state
+                targetHue: 205,
+                speed: 0.9,
+                targetSpeed: 0.9,
+                turbulence: 0.12,
+                targetTurbulence: 0.12,
+                scale: 1.0,
+                targetScale: 1.0,
+                // Pointer magnetism & hold-to-scan
                 pointerX: 0,
                 pointerY: 0,
                 pointerActive: false,
-                isCharging: false,
-                chargeLevel: 0,
-                // Visual subsystems
+                isHolding: false,
+                holdLevel: 0,
+                // Visual collections
                 pulses: [],
-                particles: [],
-                bgStars: [],
                 latticeNodes: [],
-                spectrumBars: new Float32Array(64),
-                // Audio toggle
+                flowParticles: [],
+                satellites: [
+                    { key: 'traffic', angle: -Math.PI * 0.75, label: 'TRAFFIC' },
+                    { key: 'brevo', angle: -Math.PI * 0.25, label: 'BREVO' },
+                    { key: 'supabase', angle: Math.PI * 0.5, label: 'SUPABASE' }
+                ],
+                // Audio & Timers
                 soundEnabled: false,
                 audioCtx: null,
                 toastTimer: null,
-                commandTimer: null
+                scanTimer: null
             };
 
-            // Mode Presets Configuration
-            const MODE_CONFIG = {
-                idle: {
-                    label: 'Database Ready • Idle Mode',
-                    speed: 0.85,
-                    turbulence: 0.12,
-                    scale: 1.0,
-                    baseFreq: 432,
-                    baseLoad: 14,
-                    baseTemp: 318,
-                    quote: '"CABGCU Database online. Select a mode below or submit a query."'
+            // System Monitoring State (Ready to connect to live APIs/Webhooks)
+            const hub = {
+                traffic: {
+                    inMBs: 1.84,
+                    outMBs: 0.92,
+                    reqPerSec: 142,
+                    blocked: 12,
+                    alert: false
                 },
-                listening: {
-                    label: 'Acoustic Sensors Active • Listening',
-                    speed: 1.35,
-                    turbulence: 0.24,
-                    scale: 1.08,
-                    baseFreq: 528,
-                    baseLoad: 42,
-                    baseTemp: 334,
-                    quote: '"Listening closely... acoustic waveforms locked onto your frequency."'
+                brevo: {
+                    inbound: 412,
+                    outbound: 1284,
+                    flagged: 1,
+                    spfPass: 99.6
                 },
-                thinking: {
-                    label: 'CABGCU Core Engaged • Querying',
-                    speed: 2.5,
-                    turbulence: 0.34,
-                    scale: 0.96,
-                    baseFreq: 741,
-                    baseLoad: 88,
-                    baseTemp: 372,
-                    quote: '"Indexing CABGCU Database records and evaluating optimal results..."'
+                supabase: {
+                    storageGB: 3.04,
+                    quotaGB: 8.0,
+                    connections: 27,
+                    maxConnections: 60,
+                    latencyMs: 24
                 },
-                speaking: {
-                    label: 'Vocal Matrix Active • Transmitting',
-                    speed: 1.75,
-                    turbulence: 0.28,
-                    scale: 1.06,
-                    baseFreq: 639,
-                    baseLoad: 64,
-                    baseTemp: 351,
-                    quote: '"Transmission clear. All CABGCU Database telemetry streams are nominal."'
-                }
+                logs: [
+                    {
+                        time: '00:34:12',
+                        source: 'BREVO',
+                        severity: 'FLAG',
+                        message: 'Outbound burst: 14 unverified reset emails to verify-login-alert.xyz quarantined.'
+                    },
+                    {
+                        time: '00:31:05',
+                        source: 'SUPABASE',
+                        severity: 'OK',
+                        message: 'Postgres storage at 38% (3.04 GB / 8 GB). Latency steady at 24ms.'
+                    },
+                    {
+                        time: '00:28:49',
+                        source: 'TRAFFIC',
+                        severity: 'INFO',
+                        message: 'WAF blocked 12 automated requests on /api/auth. Bandwidth nominal.'
+                    }
+                ]
             };
 
             /**
-             * Displays a clean, non-blocking toast notification.
+             * Non-blocking toast notification.
              */
-            function showToast(message) {
-                toastMessage.textContent = message;
+            function showToast(msg) {
+                toastMessage.textContent = msg;
                 toastBox.classList.remove('opacity-0');
-                toastBox.classList.add('opacity-100');
-                clearTimeout(state.toastTimer);
-                state.toastTimer = setTimeout(() => {
-                    toastBox.classList.remove('opacity-100');
+                clearTimeout(orb.toastTimer);
+                orb.toastTimer = setTimeout(() => {
                     toastBox.classList.add('opacity-0');
-                }, 2000);
+                }, 2200);
             }
 
             /**
-             * Plays a gentle futuristic sine chime using Web Audio API when audio is enabled.
+             * Gentle Web Audio chime for tactile feedback when audio is enabled.
              */
-            function playTone(freq = 440, duration = 0.25, type = 'sine') {
-                if (!state.soundEnabled) return;
+            function playTone(freq = 440, duration = 0.22, type = 'sine') {
+                if (!orb.soundEnabled) return;
                 try {
-                    if (!state.audioCtx) {
-                        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-                        state.audioCtx = new AudioContextClass();
+                    if (!orb.audioCtx) {
+                        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                        orb.audioCtx = new AudioCtx();
                     }
-                    if (state.audioCtx.state === 'suspended') {
-                        state.audioCtx.resume();
-                    }
-                    const osc = state.audioCtx.createOscillator();
-                    const gain = state.audioCtx.createGain();
+                    if (orb.audioCtx.state === 'suspended') orb.audioCtx.resume();
+                    const osc = orb.audioCtx.createOscillator();
+                    const gain = orb.audioCtx.createGain();
                     osc.type = type;
-                    osc.frequency.setValueAtTime(freq, state.audioCtx.currentTime);
-                    osc.frequency.exponentialRampToValueAtTime(freq * 1.25, state.audioCtx.currentTime + duration);
-
-                    gain.gain.setValueAtTime(0.08, state.audioCtx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.0001, state.audioCtx.currentTime + duration);
-
+                    osc.frequency.setValueAtTime(freq, orb.audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(freq * 1.18, orb.audioCtx.currentTime + duration);
+                    gain.gain.setValueAtTime(0.06, orb.audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, orb.audioCtx.currentTime + duration);
                     osc.connect(gain);
-                    gain.connect(state.audioCtx.destination);
+                    gain.connect(orb.audioCtx.destination);
                     osc.start();
-                    osc.stop(state.audioCtx.currentTime + duration);
+                    osc.stop(orb.audioCtx.currentTime + duration);
                 } catch (err) {
-                    console.warn('Web Audio unavailable:', err);
+                    console.warn('Audio unavailable:', err);
                 }
             }
 
             /**
-             * Initializes orbiting energy particles, ambient background starfield,
-             * and a 3D Fibonacci sphere lattice for the holographic interior.
+             * Appends an event to the AI Security log.
              */
-            function initParticles() {
-                state.particles = [];
-                const count = 64;
+            function addLog(source, severity, message) {
+                const time = new Date().toTimeString().split(' ')[0];
+                hub.logs.unshift({ time, source, severity, message });
+                if (hub.logs.length > 25) hub.logs.pop();
+                renderLogList();
+            }
+
+            /**
+             * Emits an energy ripple from the orb.
+             */
+            function triggerPulse(strength = 1.0, customHue = null) {
+                orb.pulses.push({
+                    radius: orb.baseRadius * 0.85,
+                    maxRadius: orb.baseRadius * (2.2 + strength * 0.5),
+                    alpha: Math.min(0.95, 0.75 * strength),
+                    hue: customHue
+                });
+                playTone(280 + strength * 50, 0.28, 'triangle');
+                if (orbHint) orbHint.classList.add('opacity-0');
+            }
+
+            /**
+             * Updates the orb's visual storytelling parameters based on current focus & alerts.
+             */
+            function syncOrbVisualStory() {
+                const hasAlert = hub.brevo.flagged > 0 || hub.traffic.alert;
+
+                if (orb.isScanning) {
+                    orb.targetHue = 200;
+                    orb.targetSpeed = 2.4;
+                    orb.targetTurbulence = 0.28;
+                    orb.targetScale = 0.96;
+                    return;
+                }
+
+                if (orb.focus === 'traffic') {
+                    orb.targetHue = hub.traffic.alert ? 355 : 192;
+                    orb.targetSpeed = hub.traffic.alert ? 2.1 : 1.35;
+                    orb.targetTurbulence = hub.traffic.alert ? 0.26 : 0.16;
+                    orb.targetScale = 1.02;
+                } else if (orb.focus === 'brevo') {
+                    orb.targetHue = hub.brevo.flagged > 0 ? 38 : 205;
+                    orb.targetSpeed = hub.brevo.flagged > 0 ? 1.6 : 0.9;
+                    orb.targetTurbulence = hub.brevo.flagged > 0 ? 0.24 : 0.11;
+                    orb.targetScale = hub.brevo.flagged > 0 ? 1.05 : 1.0;
+                } else if (orb.focus === 'supabase') {
+                    orb.targetHue = 178;
+                    orb.targetSpeed = 0.85;
+                    orb.targetTurbulence = 0.10;
+                    orb.targetScale = 0.98;
+                } else {
+                    // Overview: Luminous Blue (with subtle warning tempo if an alert exists)
+                    orb.targetHue = 205;
+                    orb.targetSpeed = hasAlert ? 1.15 : 0.85;
+                    orb.targetTurbulence = hasAlert ? 0.16 : 0.11;
+                    orb.targetScale = 1.0;
+                }
+            }
+
+            /**
+             * Switches the active focus view and updates the narrative & detail strip.
+             */
+            function setFocus(newFocus, customNarrative = null) {
+                orb.focus = newFocus;
+                syncOrbVisualStory();
+
+                // Update pill styling
+                focusButtons.forEach(btn => {
+                    const isSelected = btn.dataset.focus === newFocus;
+                    const isBrevoAlert = btn.dataset.focus === 'brevo' && hub.brevo.flagged > 0;
+                    const isTrafficAlert = btn.dataset.focus === 'traffic' && hub.traffic.alert;
+
+                    if (isSelected) {
+                        if (isBrevoAlert) {
+                            btn.className = 'focus-btn p-3 rounded-2xl border transition-all text-left active:scale-95 bg-amber-500/15 border-amber-400/50 text-amber-100 shadow-[0_0_20px_rgba(251,191,36,0.12)]';
+                        } else if (isTrafficAlert) {
+                            btn.className = 'focus-btn p-3 rounded-2xl border transition-all text-left active:scale-95 bg-rose-500/15 border-rose-400/50 text-rose-100';
+                        } else {
+                            btn.className = 'focus-btn p-3 rounded-2xl border transition-all text-left active:scale-95 bg-sky-500/15 border-sky-400/45 text-sky-100 shadow-[0_0_20px_rgba(56,189,248,0.14)]';
+                        }
+                    } else {
+                        const alertBorder = isBrevoAlert ? 'border-amber-500/30' : isTrafficAlert ? 'border-rose-500/35' : 'border-zinc-800/90';
+                        btn.className = `focus-btn p-3 rounded-2xl border transition-all text-left active:scale-95 bg-zinc-950/90 ${alertBorder} text-slate-300 hover:border-zinc-700`;
+                    }
+                });
+
+                renderStoryAndStrip(customNarrative);
+                triggerPulse(0.9);
+            }
+
+            /**
+             * Renders the single clean narrative line, pill metrics, and context-aware detail strip.
+             */
+            function renderStoryAndStrip(customNarrative = null) {
+                const { traffic, brevo, supabase } = hub;
+                const dbPct = Math.round((supabase.storageGB / supabase.quotaGB) * 100);
+                const totalAlerts = brevo.flagged + (traffic.alert ? 1 : 0);
+
+                // Top Header Status
+                if (totalAlerts > 0) {
+                    globalDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.9)] animate-pulse';
+                    globalStatus.textContent = `AI Security Agent • ${totalAlerts} Alert${totalAlerts > 1 ? 's' : ''} Need Review`;
+                } else {
+                    globalDot.className = 'w-2.5 h-2.5 rounded-full bg-sky-400 shadow-[0_0_12px_rgba(56,189,248,0.9)] animate-pulse';
+                    globalStatus.textContent = 'AI Security Agent • All Systems Nominal';
+                }
+
+                // Update 4 Pills
+                pillOverview.textContent = totalAlerts > 0 ? `${totalAlerts} Alert${totalAlerts > 1 ? 's' : ''}` : 'All Nominal';
+                dotOverview.className = totalAlerts > 0 ? 'w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping' : 'w-1.5 h-1.5 rounded-full bg-emerald-400';
+
+                pillTraffic.textContent = `${traffic.inMBs.toFixed(1)} / ${traffic.outMBs.toFixed(1)} MB/s`;
+                dotTraffic.className = traffic.alert ? 'w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping' : 'w-1.5 h-1.5 rounded-full bg-emerald-400';
+
+                pillBrevo.textContent = brevo.flagged > 0 ? `${brevo.flagged} Flagged` : 'Clean';
+                pillBrevo.className = brevo.flagged > 0 ? 'text-xs font-mono text-amber-200 mt-1' : 'text-xs font-mono text-emerald-300 mt-1';
+                dotBrevo.className = brevo.flagged > 0 ? 'w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping' : 'w-1.5 h-1.5 rounded-full bg-emerald-400';
+
+                pillSupabase.textContent = `${dbPct}% Quota`;
+                dotSupabase.className = dbPct > 80 ? 'w-1.5 h-1.5 rounded-full bg-amber-400' : 'w-1.5 h-1.5 rounded-full bg-emerald-400';
+
+                // Narrative & Context-Aware Strip
+                if (orb.focus === 'traffic') {
+                    storyHeadline.textContent = customNarrative || (traffic.alert
+                        ? `"Unusual incoming traffic spike detected (${traffic.inMBs.toFixed(2)} MB/s). Edge WAF has blocked ${traffic.blocked} suspicious requests."`
+                        : `"Website traffic is flowing smoothly — ${traffic.inMBs.toFixed(2)} MB/s incoming and ${traffic.outMBs.toFixed(2)} MB/s outgoing."`);
+                    detailMetrics.innerHTML = `
+                        <div><span class="text-slate-500">IN</span> <span class="text-sky-200 ml-1">${traffic.inMBs.toFixed(2)} MB/s</span></div>
+                        <div><span class="text-slate-500">OUT</span> <span class="text-cyan-200 ml-1">${traffic.outMBs.toFixed(2)} MB/s</span></div>
+                        <div><span class="text-slate-500">BLOCKED</span> <span class="text-sky-300 ml-1">${traffic.blocked}</span></div>
+                    `;
+                    detailActions.innerHTML = traffic.alert
+                        ? `<button id="ctx-clear" type="button" class="px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs transition-all">Mitigate Spike</button>`
+                        : `<button id="ctx-scan" type="button" class="px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 text-sky-200 text-xs transition-all">Run Sweep</button>`;
+                } else if (orb.focus === 'brevo') {
+                    storyHeadline.textContent = customNarrative || (brevo.flagged > 0
+                        ? `"Brevo Mail Guard flagged ${brevo.flagged} suspicious message(s) out of ${brevo.inbound + brevo.outbound} emails today. Amber arcs mark active flags."`
+                        : `"Brevo Mail Guard is clean. ${brevo.inbound} inbound and ${brevo.outbound} outbound emails passed verification (${brevo.spfPass}% SPF/DKIM)."`);
+                    detailMetrics.innerHTML = `
+                        <div><span class="text-slate-500">IN/OUT</span> <span class="text-sky-200 ml-1">${brevo.inbound} / ${brevo.outbound}</span></div>
+                        <div><span class="text-slate-500">FLAGS</span> <span class="${brevo.flagged > 0 ? 'text-amber-300' : 'text-emerald-300'} ml-1">${brevo.flagged}</span></div>
+                        <div><span class="text-slate-500">SPF/DKIM</span> <span class="text-emerald-300 ml-1">${brevo.spfPass}%</span></div>
+                    `;
+                    detailActions.innerHTML = brevo.flagged > 0
+                        ? `<button id="ctx-clear" type="button" class="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/35 text-amber-200 text-xs transition-all">Mark Reviewed</button>`
+                        : `<button id="ctx-sim" type="button" class="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-slate-300 text-xs transition-all">Test Flag</button>`;
+                } else if (orb.focus === 'supabase') {
+                    storyHeadline.textContent = customNarrative || `"Supabase database is healthy at ${dbPct}% storage (${supabase.storageGB.toFixed(2)} GB / ${supabase.quotaGB} GB). The outer ring mirrors live quota."`;
+                    detailMetrics.innerHTML = `
+                        <div><span class="text-slate-500">STORAGE</span> <span class="text-sky-200 ml-1">${supabase.storageGB.toFixed(2)} / ${supabase.quotaGB} GB</span></div>
+                        <div><span class="text-slate-500">CONNS</span> <span class="text-cyan-200 ml-1">${supabase.connections}/${supabase.maxConnections}</span></div>
+                        <div><span class="text-slate-500">LATENCY</span> <span class="text-emerald-300 ml-1">${Math.round(supabase.latencyMs)}ms</span></div>
+                    `;
+                    detailActions.innerHTML = `<button id="ctx-scan" type="button" class="px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 text-sky-200 text-xs transition-all">Ping DB</button>`;
+                } else {
+                    storyHeadline.textContent = customNarrative || (totalAlerts > 0
+                        ? `"Monitoring all systems. Traffic and Supabase are healthy, while ${brevo.flagged} suspicious email(s) are flagged in Brevo."`
+                        : `"All systems nominal. Website traffic, Brevo Mail Guard, and Supabase are operating within safe thresholds."`);
+                    detailMetrics.innerHTML = `
+                        <div><span class="text-slate-500">TRAFFIC</span> <span class="text-sky-200 ml-1">${traffic.reqPerSec} req/s</span></div>
+                        <div><span class="text-slate-500">BREVO</span> <span class="${brevo.flagged > 0 ? 'text-amber-300' : 'text-emerald-300'} ml-1">${brevo.flagged > 0 ? brevo.flagged + ' Flag' : 'Clean'}</span></div>
+                        <div><span class="text-slate-500">SUPABASE</span> <span class="text-emerald-300 ml-1">${dbPct}%</span></div>
+                    `;
+                    detailActions.innerHTML = totalAlerts > 0
+                        ? `<button id="ctx-clear" type="button" class="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/35 text-amber-200 text-xs transition-all">Resolve Flags</button>`
+                        : `<button id="ctx-scan" type="button" class="px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 text-sky-200 text-xs transition-all">Security Sweep</button>`;
+                }
+
+                // Bind contextual action button
+                const btnScan = document.getElementById('ctx-scan');
+                const btnClear = document.getElementById('ctx-clear');
+                const btnSim = document.getElementById('ctx-sim');
+                if (btnScan) btnScan.onclick = runSecuritySweep;
+                if (btnClear) btnClear.onclick = clearAllFlags;
+                if (btnSim) btnSim.onclick = simulateAlert;
+            }
+
+            /**
+             * Renders the expandable activity log.
+             */
+            function renderLogList() {
+                logCountEl.textContent = hub.logs.length;
+                logListEl.innerHTML = hub.logs.map(item => {
+                    const color = item.severity === 'FLAG' ? 'text-amber-300'
+                        : item.severity === 'WARN' ? 'text-rose-300'
+                        : item.severity === 'OK' ? 'text-emerald-300'
+                        : 'text-sky-300';
+                    return `
+                        <div class="flex items-start gap-2 text-slate-300">
+                            <span class="text-slate-600 shrink-0">${item.time}</span>
+                            <span class="${color} shrink-0 font-semibold">${item.source}</span>
+                            <span class="leading-snug">${item.message}</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            /**
+             * Runs an interactive visual sweep across all 3 systems.
+             */
+            function runSecuritySweep() {
+                if (orb.isScanning) return;
+                clearTimeout(orb.scanTimer);
+                orb.isScanning = true;
+                syncOrbVisualStory();
+                storyHeadline.textContent = '"Scanning Website Traffic, Brevo mail headers, and Supabase connections..."';
+                triggerPulse(1.3, 198);
+
+                orb.scanTimer = setTimeout(() => {
+                    orb.isScanning = false;
+                    syncOrbVisualStory();
+                    const dbPct = Math.round((hub.supabase.storageGB / hub.supabase.quotaGB) * 100);
+                    addLog('AGENT', hub.brevo.flagged > 0 ? 'FLAG' : 'OK',
+                        `Sweep complete: Brevo flags (${hub.brevo.flagged}), Traffic (${hub.traffic.inMBs.toFixed(1)} MB/s), Supabase (${dbPct}%).`);
+                    renderStoryAndStrip();
+                    triggerPulse(1.1);
+                    showToast('Security Sweep Complete');
+                }, 1500);
+            }
+
+            /**
+             * Simulates a suspicious Brevo email or traffic spike to demonstrate visual storytelling.
+             */
+            function simulateAlert() {
+                if (Math.random() > 0.35) {
+                    hub.brevo.flagged += 1;
+                    hub.brevo.outbound += 24;
+                    addLog('BREVO', 'FLAG', 'Suspicious outbound burst: 24 unscheduled emails with spoofed invoice link.');
+                    setFocus('brevo', '"Alert: Suspicious outbound email burst flagged in Brevo. The orb has shifted to amber to highlight the active flag."');
+                } else {
+                    hub.traffic.alert = true;
+                    hub.traffic.inMBs = 6.2;
+                    hub.traffic.blocked += 42;
+                    addLog('TRAFFIC', 'WARN', 'Incoming traffic spike (+4.4 MB/s) from 3 unverified IPs. Rate-limiting active.');
+                    setFocus('traffic', '"Warning: Incoming traffic spike detected. The orb particle stream has accelerated to reflect load."');
+                }
+                showToast('Security Alert Simulated');
+            }
+
+            /**
+             * Clears active flags and restores serene blue orb state.
+             */
+            function clearAllFlags() {
+                hub.brevo.flagged = 0;
+                hub.traffic.alert = false;
+                hub.traffic.inMBs = 1.68;
+                addLog('AGENT', 'OK', 'All active flags reviewed and cleared.');
+                syncOrbVisualStory();
+                renderStoryAndStrip('"All flags cleared. CABGCU Database has returned to serene nominal monitoring."');
+                triggerPulse(1.0, 205);
+                showToast('All Flags Cleared');
+            }
+
+            /**
+             * Handles natural language queries from the bottom input bar.
+             */
+            function handleQuery(raw) {
+                const q = raw.toLowerCase();
+                if (q.includes('brevo') || q.includes('mail') || q.includes('email') || q.includes('flag')) {
+                    setFocus('brevo');
+                } else if (q.includes('traffic') || q.includes('web') || q.includes('in') || q.includes('out')) {
+                    setFocus('traffic');
+                } else if (q.includes('supabase') || q.includes('db') || q.includes('quota') || q.includes('storage')) {
+                    setFocus('supabase');
+                } else if (q.includes('clear') || q.includes('resolve')) {
+                    clearAllFlags();
+                } else if (q.includes('sim') || q.includes('test')) {
+                    simulateAlert();
+                } else if (q.includes('scan') || q.includes('sweep')) {
+                    runSecuritySweep();
+                } else {
+                    setFocus('overview', `"CABGCU Agent checked '${raw}': Traffic at ${hub.traffic.inMBs.toFixed(1)} MB/s, Brevo has ${hub.brevo.flagged} flag(s), Supabase at ${Math.round((hub.supabase.storageGB / hub.supabase.quotaGB) * 100)}%."`);
+                }
+            }
+
+            /**
+             * Initializes 3D Fibonacci sphere lattice and directional traffic flow particles.
+             */
+            function initVisualGeometry() {
+                orb.latticeNodes = [];
+                const count = 46;
+                const golden = (1 + Math.sqrt(5)) / 2;
                 for (let i = 0; i < count; i++) {
-                    state.particles.push({
-                        angle: Math.random() * Math.PI * 2,
-                        orbitFactor: 1.06 + Math.random() * 0.78,
-                        speed: (0.003 + Math.random() * 0.011) * (Math.random() > 0.5 ? 1 : -1),
-                        size: 1.0 + Math.random() * 2.4,
-                        alpha: 0.25 + Math.random() * 0.7,
-                        wobblePhase: Math.random() * Math.PI * 2,
-                        isBright: Math.random() > 0.75
-                    });
-                }
-
-                // Ambient background micro-dust for depth
-                state.bgStars = [];
-                for (let i = 0; i < 45; i++) {
-                    state.bgStars.push({
-                        nx: Math.random(),
-                        ny: Math.random(),
-                        size: 0.6 + Math.random() * 1.4,
-                        alpha: 0.08 + Math.random() * 0.25,
-                        twinkleSpeed: 0.5 + Math.random() * 1.8,
-                        phase: Math.random() * Math.PI * 2
-                    });
-                }
-
-                // 3D Fibonacci Sphere Lattice Nodes (gives genuine volumetric depth)
-                state.latticeNodes = [];
-                const nodeCount = 54;
-                const goldenRatio = (1 + Math.sqrt(5)) / 2;
-                for (let i = 0; i < nodeCount; i++) {
-                    const theta = (2 * Math.PI * i) / goldenRatio;
-                    const phi = Math.acos(1 - (2 * (i + 0.5)) / nodeCount);
-                    state.latticeNodes.push({
+                    const theta = (2 * Math.PI * i) / golden;
+                    const phi = Math.acos(1 - (2 * (i + 0.5)) / count);
+                    orb.latticeNodes.push({
                         x: Math.sin(phi) * Math.cos(theta),
                         y: Math.cos(phi),
                         z: Math.sin(phi) * Math.sin(theta)
                     });
                 }
+
+                // Particles that orbit calmly in overview, or stream IN/OUT in traffic focus
+                orb.flowParticles = [];
+                for (let i = 0; i < 48; i++) {
+                    orb.flowParticles.push({
+                        angle: Math.random() * Math.PI * 2,
+                        dist: 1.05 + Math.random() * 0.85,
+                        speed: 0.004 + Math.random() * 0.008,
+                        dir: i % 2 === 0 ? -1 : 1, // -1 incoming, +1 outgoing
+                        size: 1.1 + Math.random() * 1.8,
+                        alpha: 0.25 + Math.random() * 0.6
+                    });
+                }
             }
 
             /**
-             * Resizes the canvas to match its responsive container with sharp DPR scaling.
+             * Responsive canvas sizing with crisp DPR.
              */
             function resizeCanvas() {
                 const rect = stage.getBoundingClientRect();
                 const dpr = Math.min(window.devicePixelRatio || 1, 2);
-                state.width = rect.width;
-                state.height = rect.height;
+                orb.width = rect.width;
+                orb.height = rect.height;
                 canvas.width = Math.floor(rect.width * dpr);
                 canvas.height = Math.floor(rect.height * dpr);
                 ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-                state.cx = state.width / 2;
-                state.cy = state.height / 2;
-                state.baseRadius = Math.min(state.width, state.height) * 0.27;
+                orb.cx = orb.width / 2;
+                orb.cy = orb.height / 2;
+                orb.baseRadius = Math.min(orb.width, orb.height) * 0.29;
             }
 
             /**
-             * Switches the active mode of the Blue Orb and updates UI styling.
+             * Draws an organic plasma wave layer.
              */
-            function setMode(newMode, customQuote) {
-                const cfg = MODE_CONFIG[newMode] || MODE_CONFIG.idle;
-                state.mode = newMode;
-                state.targetSpeed = cfg.speed;
-                state.targetTurbulence = cfg.turbulence;
-                state.targetScale = cfg.scale;
-
-                statusSubtitle.textContent = cfg.label;
-                orbResponse.textContent = customQuote || cfg.quote;
-
-                // Update button active states
-                modeButtons.forEach(btn => {
-                    const isActive = btn.dataset.mode === newMode;
-                    if (isActive) {
-                        btn.className = 'mode-btn p-3 rounded-xl text-xs sm:text-sm font-medium transition-all active:scale-95 bg-sky-500/25 text-sky-200 border border-sky-400/40 shadow-[0_0_15px_rgba(56,189,248,0.2)]';
-                    } else {
-                        btn.className = 'mode-btn p-3 rounded-xl text-xs sm:text-sm font-medium transition-all active:scale-95 bg-zinc-900/70 text-slate-300 hover:bg-zinc-800 border border-transparent';
-                    }
-                });
-
-                const toneMap = { idle: 320, listening: 480, thinking: 600, speaking: 520 };
-                playTone(toneMap[newMode] || 400, 0.22);
-            }
-
-            /**
-             * Triggers an expanding glowing energy shockwave from the orb core.
-             */
-            function triggerPulse(strength = 1.0) {
-                state.pulses.push({
-                    radius: state.baseRadius * 0.85,
-                    maxRadius: state.baseRadius * (2.3 + strength * 0.6),
-                    alpha: Math.min(1, 0.85 * strength),
-                    lineWidth: 2.0 + strength * 1.4
-                });
-                playTone(240 + strength * 40, 0.35, 'triangle');
-                if (orbHint) orbHint.classList.add('opacity-0');
-            }
-
-            /**
-             * Draws subtle floating background bokeh/starfield particles.
-             */
-            function drawBackgroundField(hue) {
-                for (let i = 0; i < state.bgStars.length; i++) {
-                    const s = state.bgStars[i];
-                    const twinkle = 0.55 + 0.45 * Math.sin(state.time * s.twinkleSpeed + s.phase);
-                    const x = s.nx * state.width;
-                    const y = s.ny * state.height;
-                    ctx.fillStyle = `hsla(${hue - 8}, 90%, 78%, ${s.alpha * twinkle * state.intensity})`;
-                    ctx.beginPath();
-                    ctx.arc(x, y, s.size, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            }
-
-            /**
-             * Draws a precision holographic HUD reticle with degree ticks & rotating scanner arcs.
-             */
-            function drawHudReticle(cx, cy, radius, hue) {
-                if (!state.showHud) return;
-
-                ctx.save();
-                ctx.translate(cx, cy);
-
-                const outerR = radius * 1.56;
-                const innerR = radius * 1.32;
-                const baseAlpha = 0.22 * state.intensity;
-
-                // Fine outer compass circle
+            function drawPlasmaLayer(cx, cy, radius, phase, idx, hue) {
+                const pts = 64;
                 ctx.beginPath();
-                ctx.arc(0, 0, outerR, 0, Math.PI * 2);
-                ctx.strokeStyle = `hsla(${hue}, 100%, 70%, ${baseAlpha * 0.6})`;
-                ctx.lineWidth = 1;
-                ctx.stroke();
-
-                // 72 precision degree ticks rotating slowly
-                ctx.save();
-                ctx.rotate(state.time * 0.08);
-                for (let i = 0; i < 72; i++) {
-                    const angle = (i / 72) * Math.PI * 2;
-                    const isMajor = i % 6 === 0;
-                    const tickLen = isMajor ? 9 : 4;
-                    const r1 = outerR - tickLen;
-                    const r2 = outerR;
-                    ctx.beginPath();
-                    ctx.moveTo(Math.cos(angle) * r1, Math.sin(angle) * r1);
-                    ctx.lineTo(Math.cos(angle) * r2, Math.sin(angle) * r2);
-                    ctx.strokeStyle = `hsla(${hue - 10}, 100%, ${isMajor ? 80 : 65}%, ${isMajor ? baseAlpha * 1.8 : baseAlpha * 0.8})`;
-                    ctx.lineWidth = isMajor ? 1.5 : 1;
-                    ctx.stroke();
-                }
-                ctx.restore();
-
-                // Counter-rotating segmented scanner arcs
-                ctx.save();
-                ctx.rotate(-state.time * 0.28);
-                ctx.lineWidth = 2;
-                ctx.strokeStyle = `hsla(${hue - 15}, 100%, 75%, ${baseAlpha * 2.1})`;
-                for (let s = 0; s < 3; s++) {
-                    const start = s * ((Math.PI * 2) / 3);
-                    ctx.beginPath();
-                    ctx.arc(0, 0, innerR, start, start + 0.55);
-                    ctx.stroke();
-                }
-                ctx.restore();
-
-                // Charge progress ring when holding down the orb
-                if (state.chargeLevel > 0.02) {
-                    ctx.beginPath();
-                    ctx.arc(0, 0, outerR + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * state.chargeLevel);
-                    ctx.strokeStyle = `hsla(${hue - 18}, 100%, 82%, ${0.85 * state.intensity})`;
-                    ctx.lineWidth = 3;
-                    ctx.lineCap = 'round';
-                    ctx.stroke();
-                }
-
-                ctx.restore();
-            }
-
-            /**
-             * Draws a 64-bar radial harmonic spectrum visualizer around the orb perimeter.
-             */
-            function drawSpectrumRing(cx, cy, radius, hue) {
-                const count = state.spectrumBars.length;
-                const baseR = radius * 1.13;
-                const t = state.time;
-
-                ctx.save();
-                ctx.translate(cx, cy);
-
-                for (let i = 0; i < count; i++) {
-                    const angle = (i / count) * Math.PI * 2 - Math.PI / 2;
-                    let targetVal = 0.12;
-
-                    if (state.mode === 'idle') {
-                        targetVal = 0.08 + 0.08 * Math.sin(t * 2.2 + i * 0.35);
-                    } else if (state.mode === 'listening') {
-                        targetVal = 0.15 + 0.35 * Math.abs(Math.sin(t * 3.8 + i * 0.5)) * Math.cos(t * 1.4 - i * 0.2);
-                    } else if (state.mode === 'thinking') {
-                        const scanner = Math.max(0, Math.cos(angle - t * 3.5));
-                        targetVal = 0.12 + Math.pow(scanner, 4) * 0.65;
-                    } else if (state.mode === 'speaking') {
-                        targetVal = 0.18 + 0.55 * Math.abs(Math.sin(t * 7.5 + i * 0.65) * Math.cos(t * 3.1 + i * 0.25));
-                    }
-
-                    targetVal += state.chargeLevel * 0.45;
-                    state.spectrumBars[i] += (targetVal - state.spectrumBars[i]) * 0.18;
-
-                    const barHeight = Math.max(2, state.spectrumBars[i] * radius * 0.32 * state.detailLevel);
-                    const x1 = Math.cos(angle) * baseR;
-                    const y1 = Math.sin(angle) * baseR;
-                    const x2 = Math.cos(angle) * (baseR + barHeight);
-                    const y2 = Math.sin(angle) * (baseR + barHeight);
-
-                    ctx.beginPath();
-                    ctx.moveTo(x1, y1);
-                    ctx.lineTo(x2, y2);
-                    ctx.strokeStyle = `hsla(${hue - 10}, 100%, 74%, ${(0.28 + state.spectrumBars[i] * 0.65) * state.intensity})`;
-                    ctx.lineWidth = 2;
-                    ctx.lineCap = 'round';
-                    ctx.stroke();
-                }
-
-                ctx.restore();
-            }
-
-            /**
-             * Projects and renders a rotating 3D holographic energy lattice inside the orb.
-             */
-            function draw3DLattice(cx, cy, radius, hue) {
-                if (state.detailLevel <= 0.05) return;
-
-                const rotY = state.time * 0.45;
-                const rotX = Math.sin(state.time * 0.3) * 0.38 + (state.pointerActive ? (state.pointerY - state.cy) * 0.0018 : 0);
-                const cosY = Math.cos(rotY);
-                const sinY = Math.sin(rotY);
-                const cosX = Math.cos(rotX);
-                const sinX = Math.sin(rotX);
-
-                const projected = [];
-                const sphereR = radius * 0.86;
-
-                for (let i = 0; i < state.latticeNodes.length; i++) {
-                    const n = state.latticeNodes[i];
-                    // Rotate around Y
-                    const x1 = n.x * cosY - n.z * sinY;
-                    const z1 = n.z * cosY + n.x * sinY;
-                    // Rotate around X
-                    const y2 = n.y * cosX - z1 * sinX;
-                    const z2 = z1 * cosX + n.y * sinX;
-
-                    // Perspective projection
-                    const depth = (z2 + 1.8) / 2.8;
-                    projected.push({
-                        x: cx + x1 * sphereR,
-                        y: cy + y2 * sphereR,
-                        z: z2,
-                        depth
-                    });
-                }
-
-                // Draw connecting neural filaments between nearby 3D nodes
-                const maxDistSq = (sphereR * 0.56) * (sphereR * 0.56);
-                ctx.lineWidth = 0.85;
-                for (let i = 0; i < projected.length; i++) {
-                    const a = projected[i];
-                    if (a.z < -0.25) continue; // Cull far back-face clutter
-                    for (let j = i + 1; j < projected.length; j++) {
-                        const b = projected[j];
-                        if (b.z < -0.25) continue;
-                        const dx = a.x - b.x;
-                        const dy = a.y - b.y;
-                        const d2 = dx * dx + dy * dy;
-                        if (d2 < maxDistSq) {
-                            const alpha = (1 - d2 / maxDistSq) * 0.34 * a.depth * state.detailLevel * state.intensity;
-                            ctx.strokeStyle = `hsla(${hue - 12}, 100%, 78%, ${alpha})`;
-                            ctx.beginPath();
-                            ctx.moveTo(a.x, a.y);
-                            ctx.lineTo(b.x, b.y);
-                            ctx.stroke();
-                        }
-                    }
-                }
-
-                // Draw glowing lattice vertices
-                for (let i = 0; i < projected.length; i++) {
-                    const p = projected[i];
-                    if (p.z < -0.35) continue;
-                    const alpha = Math.max(0.05, p.depth * 0.72 * state.detailLevel * state.intensity);
-                    ctx.fillStyle = `hsla(${hue - 18}, 100%, 88%, ${alpha})`;
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, 1.1 + p.depth * 1.4, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            }
-
-            /**
-             * Draws procedural electric plasma arcs crackling across the orb surface.
-             */
-            function drawPlasmaArcs(cx, cy, radius, hue) {
-                if (state.detailLevel <= 0.1) return;
-
-                const arcCount = Math.round(
-                    (state.mode === 'thinking' ? 5 : state.mode === 'speaking' ? 4 : 2) * state.detailLevel +
-                    state.chargeLevel * 4
-                );
-
-                for (let a = 0; a < arcCount; a++) {
-                    const seed = Math.floor(state.time * 12) + a * 31;
-                    const startAngle = ((seed * 1.618) % 1) * Math.PI * 2;
-                    const span = 0.55 + ((seed * 0.73) % 0.85);
-                    const segments = 9;
-
-                    ctx.beginPath();
-                    for (let s = 0; s <= segments; s++) {
-                        const frac = s / segments;
-                        const ang = startAngle + frac * span;
-                        // Taper displacement at endpoints so arcs anchor cleanly inside the sphere
-                        const envelope = Math.sin(frac * Math.PI);
-                        const jitter = Math.sin(state.time * 18 + s * 2.7 + a * 4.1) * radius * 0.14 * envelope;
-                        const r = radius * (0.72 + envelope * 0.24) + jitter;
-                        const x = cx + Math.cos(ang) * r;
-                        const y = cy + Math.sin(ang) * r;
-                        if (s === 0) ctx.moveTo(x, y);
-                        else ctx.lineTo(x, y);
-                    }
-
-                    ctx.strokeStyle = `hsla(${hue - 20}, 100%, 86%, ${(0.35 + state.chargeLevel * 0.45) * state.intensity})`;
-                    ctx.lineWidth = 1.2 + state.chargeLevel * 1.1;
-                    ctx.stroke();
-                }
-            }
-
-            /**
-             * Updates the live HUD telemetry metrics every few frames.
-             */
-            function updateTelemetry() {
-                if (state.frameCount % 8 !== 0) return;
-                const cfg = MODE_CONFIG[state.mode] || MODE_CONFIG.idle;
-                const jitter = Math.sin(state.time * 2.7);
-                const chargeBoost = state.chargeLevel;
-
-                const freq = cfg.baseFreq * state.speedMultiplier + jitter * 4.2 + chargeBoost * 180;
-                const flux = Math.max(82.0, Math.min(99.9, 99.4 - state.currentTurbulence * 12 + jitter * 0.3 - chargeBoost * 4.5));
-                const temp = cfg.baseTemp + jitter * 1.8 + chargeBoost * 68 + (state.intensity - 1) * 18;
-                const load = Math.min(100, Math.round(cfg.baseLoad * state.speedMultiplier + jitter * 3 + chargeBoost * 40));
-
-                metricFreq.textContent = freq.toFixed(1);
-                metricFlux.textContent = `${flux.toFixed(1)}%`;
-                metricTemp.textContent = temp.toFixed(1);
-                metricLoad.textContent = `${load}%`;
-            }
-
-            /**
-             * Draws an organic, undulating plasma wave layer inside the orb.
-             */
-            function drawPlasmaLayer(cx, cy, radius, phaseOffset, layerIndex, hue) {
-                const points = 72;
-                const turb = state.currentTurbulence;
-                const t = state.time;
-
-                ctx.beginPath();
-                for (let i = 0; i <= points; i++) {
-                    const angle = (i / points) * Math.PI * 2;
-                    // Multi-harmonic sine distortion for smooth liquid-energy movement
-                    const wave1 = Math.sin(angle * 3 + t * 1.4 + phaseOffset) * turb;
-                    const wave2 = Math.cos(angle * 5 - t * 1.9 + layerIndex) * (turb * 0.55);
-                    const speakMod = state.mode === 'speaking'
-                        ? Math.sin(t * 9 + angle * 2) * 0.08
-                        : 0;
-
-                    const r = radius * (1 + wave1 + wave2 + speakMod);
-                    const x = cx + Math.cos(angle) * r;
-                    const y = cy + Math.sin(angle) * r;
-
+                for (let i = 0; i <= pts; i++) {
+                    const a = (i / pts) * Math.PI * 2;
+                    const w1 = Math.sin(a * 3 + orb.time * 1.3 + phase) * orb.turbulence;
+                    const w2 = Math.cos(a * 5 - orb.time * 1.7 + idx) * (orb.turbulence * 0.5);
+                    const r = radius * (1 + w1 + w2);
+                    const x = cx + Math.cos(a) * r;
+                    const y = cy + Math.sin(a) * r;
                     if (i === 0) ctx.moveTo(x, y);
                     else ctx.lineTo(x, y);
                 }
                 ctx.closePath();
 
-                const grad = ctx.createRadialGradient(
-                    cx - radius * 0.2,
-                    cy - radius * 0.2,
-                    radius * 0.05,
-                    cx,
-                    cy,
-                    radius * 1.25
-                );
-                const lightness = Math.min(92, 62 + layerIndex * 10);
-                const alphaCore = Math.min(0.95, 0.45 * state.intensity);
-
-                grad.addColorStop(0, `hsla(${hue - 12}, 100%, ${lightness}%, ${alphaCore})`);
-                grad.addColorStop(0.6, `hsla(${hue}, 95%, 52%, ${0.28 * state.intensity})`);
-                grad.addColorStop(1, `hsla(${hue + 18}, 90%, 35%, 0)`);
-
+                const grad = ctx.createRadialGradient(cx - radius * 0.18, cy - radius * 0.18, radius * 0.05, cx, cy, radius * 1.2);
+                grad.addColorStop(0, `hsla(${hue - 10}, 100%, ${64 + idx * 10}%, 0.48)`);
+                grad.addColorStop(0.6, `hsla(${hue}, 95%, 50%, 0.24)`);
+                grad.addColorStop(1, `hsla(${hue + 14}, 90%, 30%, 0)`);
                 ctx.fillStyle = grad;
                 ctx.fill();
             }
 
             /**
-             * Main animation render loop.
+             * Draws the 3D rotating holographic lattice inside the orb.
              */
-            function render() {
-                try {
-                    state.frameCount++;
+            function drawLattice(cx, cy, radius, hue) {
+                const rotY = orb.time * 0.42;
+                const rotX = Math.sin(orb.time * 0.28) * 0.35 + (orb.pointerActive ? (orb.pointerY - orb.cy) * 0.0014 : 0);
+                const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+                const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+                const sphereR = radius * 0.85;
+                const proj = [];
 
-                    // Update Hold-to-Charge progression
-                    if (state.isCharging) {
-                        state.chargeLevel = Math.min(1, state.chargeLevel + 0.018);
-                    } else {
-                        state.chargeLevel = Math.max(0, state.chargeLevel - 0.05);
-                    }
+                for (let i = 0; i < orb.latticeNodes.length; i++) {
+                    const n = orb.latticeNodes[i];
+                    const x1 = n.x * cosY - n.z * sinY;
+                    const z1 = n.z * cosY + n.x * sinY;
+                    const y2 = n.y * cosX - z1 * sinX;
+                    const z2 = z1 * cosX + n.y * sinX;
+                    proj.push({ x: cx + x1 * sphereR, y: cy + y2 * sphereR, z: z2, depth: (z2 + 1.8) / 2.8 });
+                }
 
-                    // Smoothly interpolate parameters toward mode targets
-                    state.currentSpeed += (state.targetSpeed + state.chargeLevel * 2.2 - state.currentSpeed) * 0.06;
-                    state.currentTurbulence += (state.targetTurbulence + state.chargeLevel * 0.22 - state.currentTurbulence) * 0.06;
-                    state.currentScale += (state.targetScale + state.chargeLevel * 0.12 - state.currentScale) * 0.06;
-
-                    state.time += 0.022 * state.currentSpeed * state.speedMultiplier;
-
-                    ctx.clearRect(0, 0, state.width, state.height);
-
-                    // Subtle magnetic shift toward user pointer
-                    let offsetX = 0;
-                    let offsetY = 0;
-                    if (state.pointerActive) {
-                        offsetX = (state.pointerX - state.cx) * 0.065;
-                        offsetY = (state.pointerY - state.cy) * 0.065;
-                    }
-
-                    const cx = state.cx + offsetX;
-                    const cy = state.cy + offsetY;
-                    const breathe = Math.sin(state.time * 1.6) * 0.032;
-                    const radius = state.baseRadius * (state.currentScale + breathe);
-                    const hue = state.hue;
-
-                    // 0. Ambient Background Micro-Dust Field
-                    drawBackgroundField(hue);
-
-                    // 1. Deep Ambient Outer Aura
-                    const auraGrad = ctx.createRadialGradient(cx, cy, radius * 0.2, cx, cy, radius * 2.25);
-                    auraGrad.addColorStop(0, `hsla(${hue}, 100%, 60%, ${(0.34 + state.chargeLevel * 0.22) * state.intensity})`);
-                    auraGrad.addColorStop(0.45, `hsla(${hue + 12}, 95%, 45%, ${0.15 * state.intensity})`);
-                    auraGrad.addColorStop(1, `hsla(${hue + 20}, 90%, 20%, 0)`);
-                    ctx.fillStyle = auraGrad;
-                    ctx.beginPath();
-                    ctx.arc(cx, cy, radius * 2.25, 0, Math.PI * 2);
-                    ctx.fill();
-
-                    // 2. Precision Holographic HUD Reticle & 64-Bar Harmonic Spectrum
-                    drawHudReticle(cx, cy, radius, hue);
-                    drawSpectrumRing(cx, cy, radius, hue);
-
-                    // 3. Rotating 3D Tilted Orbital Rings
-                    ctx.save();
-                    ctx.translate(cx, cy);
-                    const ringAlpha = (state.mode === 'thinking' ? 0.55 : 0.26) + state.chargeLevel * 0.3;
-                    for (let rIdx = 0; rIdx < 3; rIdx++) {
-                        ctx.save();
-                        ctx.rotate(state.time * (rIdx % 2 === 0 ? 0.42 : -0.62) + rIdx * 1.05);
-                        ctx.scale(1, 0.32 + rIdx * 0.15);
-                        ctx.beginPath();
-                        ctx.arc(0, 0, radius * (1.28 + rIdx * 0.14), 0, Math.PI * 2);
-                        ctx.strokeStyle = `hsla(${hue - 8}, 100%, 74%, ${ringAlpha * state.intensity})`;
-                        ctx.lineWidth = rIdx === 0 ? 1.6 : 1.1;
-                        ctx.stroke();
-                        ctx.restore();
-                    }
-                    ctx.restore();
-
-                    // 4. Expanding Energy Pulses
-                    for (let i = state.pulses.length - 1; i >= 0; i--) {
-                        const p = state.pulses[i];
-                        p.radius += 3.5;
-                        p.alpha *= 0.94;
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, p.radius, 0, Math.PI * 2);
-                        ctx.strokeStyle = `hsla(${hue - 10}, 100%, 78%, ${p.alpha})`;
-                        ctx.lineWidth = p.lineWidth || 2.4;
-                        ctx.stroke();
-
-                        if (p.alpha < 0.02 || p.radius > p.maxRadius) {
-                            state.pulses.splice(i, 1);
+                const maxD2 = (sphereR * 0.56) * (sphereR * 0.56);
+                ctx.lineWidth = 0.8;
+                for (let i = 0; i < proj.length; i++) {
+                    if (proj[i].z < -0.2) continue;
+                    for (let j = i + 1; j < proj.length; j++) {
+                        if (proj[j].z < -0.2) continue;
+                        const dx = proj[i].x - proj[j].x;
+                        const dy = proj[i].y - proj[j].y;
+                        const d2 = dx * dx + dy * dy;
+                        if (d2 < maxD2) {
+                            const alpha = (1 - d2 / maxD2) * 0.3 * proj[i].depth;
+                            ctx.strokeStyle = `hsla(${hue - 10}, 100%, 78%, ${alpha})`;
+                            ctx.beginPath();
+                            ctx.moveTo(proj[i].x, proj[i].y);
+                            ctx.lineTo(proj[j].x, proj[j].y);
+                            ctx.stroke();
                         }
                     }
+                }
+            }
 
-                    // 5. Layered Plasma Core, 3D Lattice & Electric Arcs (Additive Blending)
+            /**
+             * Draws visual storytelling overlays directly around the orb:
+             * - Overview: 3 orbiting system satellites (colored by health)
+             * - Traffic: directional incoming/outgoing data streams
+             * - Brevo: warning arcs when suspicious emails are flagged
+             * - Supabase: clean circular storage quota gauge
+             */
+            function drawStoryVisuals(cx, cy, radius, hue) {
+                // 1. Scanning radar sweep
+                if (orb.isScanning) {
+                    orb.scanAngle += 0.08;
                     ctx.save();
-                    ctx.globalCompositeOperation = 'lighter';
-
-                    drawPlasmaLayer(cx, cy, radius * 1.03, 0.0, 0, hue + 10);
-                    drawPlasmaLayer(cx, cy, radius * 0.92, 2.1, 1, hue);
-                    drawPlasmaLayer(cx, cy, radius * 0.78, 4.2, 2, hue - 12);
-
-                    // Volumetric 3D Holographic Lattice inside the plasma sphere
-                    draw3DLattice(cx, cy, radius, hue);
-
-                    // Procedural Electric Plasma Filaments
-                    drawPlasmaArcs(cx, cy, radius, hue);
-
-                    // 6. Brilliant White-Blue Inner Singularity Core
-                    const coreGrad = ctx.createRadialGradient(
-                        cx - radius * 0.12,
-                        cy - radius * 0.15,
-                        radius * 0.03,
-                        cx,
-                        cy,
-                        radius * (0.72 + state.chargeLevel * 0.15)
-                    );
-                    coreGrad.addColorStop(0, `hsla(${hue - 16}, 100%, 97%, ${0.95 * state.intensity})`);
-                    coreGrad.addColorStop(0.32, `hsla(${hue - 5}, 100%, 68%, ${0.68 * state.intensity})`);
-                    coreGrad.addColorStop(1, `hsla(${hue + 10}, 100%, 40%, 0)`);
-
-                    ctx.fillStyle = coreGrad;
+                    ctx.translate(cx, cy);
+                    ctx.rotate(orb.scanAngle);
                     ctx.beginPath();
-                    ctx.arc(cx, cy, radius * (0.72 + state.chargeLevel * 0.15), 0, Math.PI * 2);
-                    ctx.fill();
-
-                    // 7. Fresnel Containment Shell & Dual Specular Highlights
-                    ctx.beginPath();
-                    ctx.arc(cx, cy, radius * 0.98, 0, Math.PI * 2);
-                    ctx.strokeStyle = `hsla(${hue - 14}, 100%, 82%, ${0.26 * state.intensity})`;
-                    ctx.lineWidth = 1.5;
-                    ctx.stroke();
-
-                    ctx.beginPath();
-                    ctx.arc(cx, cy, radius * 0.94, Math.PI * 1.08, Math.PI * 1.62);
-                    ctx.strokeStyle = `hsla(${hue - 20}, 100%, 92%, ${0.42 * state.intensity})`;
-                    ctx.lineWidth = 2.2;
+                    ctx.arc(0, 0, radius * 1.38, 0, 1.1);
+                    ctx.strokeStyle = 'hsla(195, 100%, 76%, 0.75)';
+                    ctx.lineWidth = 2.5;
                     ctx.lineCap = 'round';
                     ctx.stroke();
+                    ctx.restore();
+                }
 
+                // 2. Supabase Quota Arc (when focused on Supabase)
+                if (orb.focus === 'supabase') {
+                    const pct = Math.min(1, hub.supabase.storageGB / hub.supabase.quotaGB);
+                    const ringR = radius * 1.36;
+                    ctx.save();
                     ctx.beginPath();
-                    ctx.arc(cx, cy, radius * 0.94, Math.PI * 0.18, Math.PI * 0.42);
-                    ctx.strokeStyle = `hsla(${hue}, 100%, 76%, ${0.22 * state.intensity})`;
-                    ctx.lineWidth = 1.5;
-                    ctx.lineCap = 'round';
+                    ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(56, 189, 248, 0.14)';
+                    ctx.lineWidth = 4;
                     ctx.stroke();
 
-                    // 8. Orbiting Micro-Particles
-                    state.particles.forEach(pt => {
-                        pt.angle += pt.speed * state.currentSpeed * state.speedMultiplier;
-                        const wobble = Math.sin(state.time * 2 + pt.wobblePhase) * 8;
-                        const dist = radius * pt.orbitFactor + wobble;
-                        const px = cx + Math.cos(pt.angle) * dist;
-                        const py = cy + Math.sin(pt.angle) * dist;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, ringR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pct);
+                    ctx.strokeStyle = 'hsla(176, 95%, 64%, 0.9)';
+                    ctx.lineWidth = 4;
+                    ctx.lineCap = 'round';
+                    ctx.stroke();
+                    ctx.restore();
+                }
 
-                        ctx.fillStyle = `hsla(${pt.isBright ? hue - 18 : hue - 6}, 100%, ${pt.isBright ? 92 : 78}%, ${pt.alpha * state.intensity})`;
+                // 3. Brevo Warning Arcs (when Brevo has active flags)
+                if (hub.brevo.flagged > 0 && (orb.focus === 'brevo' || orb.focus === 'overview')) {
+                    const arcCount = orb.focus === 'brevo' ? 4 : 2;
+                    for (let a = 0; a < arcCount; a++) {
+                        const seed = Math.floor(orb.time * 10) + a * 23;
+                        const startA = ((seed * 1.618) % 1) * Math.PI * 2;
                         ctx.beginPath();
-                        ctx.arc(px, py, pt.size, 0, Math.PI * 2);
+                        for (let s = 0; s <= 8; s++) {
+                            const frac = s / 8;
+                            const ang = startA + frac * 0.7;
+                            const env = Math.sin(frac * Math.PI);
+                            const jitter = Math.sin(orb.time * 16 + s * 2.5 + a) * radius * 0.12 * env;
+                            const r = radius * (0.82 + env * 0.22) + jitter;
+                            const x = cx + Math.cos(ang) * r;
+                            const y = cy + Math.sin(ang) * r;
+                            if (s === 0) ctx.moveTo(x, y);
+                            else ctx.lineTo(x, y);
+                        }
+                        ctx.strokeStyle = `hsla(38, 100%, 68%, ${orb.focus === 'brevo' ? 0.72 : 0.38})`;
+                        ctx.lineWidth = orb.focus === 'brevo' ? 1.8 : 1.2;
+                        ctx.stroke();
+                    }
+                }
+
+                // 4. Overview Orbiting System Satellites
+                if (orb.focus === 'overview') {
+                    const orbitR = radius * 1.42;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, orbitR, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(56, 189, 248, 0.12)';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+
+                    orb.satellites.forEach((sat, idx) => {
+                        sat.angle += 0.0045;
+                        const sx = cx + Math.cos(sat.angle) * orbitR;
+                        const sy = cy + Math.sin(sat.angle) * orbitR;
+                        const isWarn = (sat.key === 'brevo' && hub.brevo.flagged > 0) ||
+                                       (sat.key === 'traffic' && hub.traffic.alert);
+                        const color = isWarn ? 'rgba(251, 191, 36, 0.95)' : 'rgba(56, 189, 248, 0.9)';
+
+                        // Subtle glow halo
+                        ctx.beginPath();
+                        ctx.arc(sx, sy, isWarn ? 7 : 5, 0, Math.PI * 2);
+                        ctx.fillStyle = isWarn ? 'rgba(251, 191, 36, 0.22)' : 'rgba(56, 189, 248, 0.18)';
+                        ctx.fill();
+
+                        // Satellite core dot
+                        ctx.beginPath();
+                        ctx.arc(sx, sy, 3, 0, Math.PI * 2);
+                        ctx.fillStyle = color;
                         ctx.fill();
                     });
-
-                    ctx.restore();
-
-                    // Update numeric HUD readouts
-                    updateTelemetry();
-                } catch (err) {
-                    console.error('Render loop error:', err);
                 }
+
+                // 5. Particles: Flowing IN/OUT during Traffic focus, calm orbit otherwise
+                orb.flowParticles.forEach(pt => {
+                    if (orb.focus === 'traffic') {
+                        const flowSpeed = (hub.traffic.alert ? 0.022 : 0.011);
+                        pt.dist += pt.dir * flowSpeed;
+                        if (pt.dist < 0.85) pt.dist = 1.9;
+                        if (pt.dist > 1.95) pt.dist = 0.88;
+                    } else {
+                        pt.angle += pt.speed * orb.speed;
+                    }
+                    const px = cx + Math.cos(pt.angle) * (radius * pt.dist);
+                    const py = cy + Math.sin(pt.angle) * (radius * pt.dist);
+                    const pHue = orb.focus === 'traffic' ? (pt.dir < 0 ? 195 : 175) : hue - 8;
+                    ctx.fillStyle = `hsla(${pHue}, 100%, 78%, ${pt.alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(px, py, pt.size, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                // 6. Hold-to-Scan progress ring
+                if (orb.holdLevel > 0.03) {
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, radius * 1.5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * orb.holdLevel);
+                    ctx.strokeStyle = 'hsla(198, 100%, 82%, 0.85)';
+                    ctx.lineWidth = 2.5;
+                    ctx.lineCap = 'round';
+                    ctx.stroke();
+                }
+            }
+
+            /**
+             * Main animation loop.
+             */
+            function render() {
+                orb.frame++;
+
+                // Hold progression
+                if (orb.isHolding) orb.holdLevel = Math.min(1, orb.holdLevel + 0.022);
+                else orb.holdLevel = Math.max(0, orb.holdLevel - 0.06);
+
+                // Smooth hue & energy interpolation
+                let hueDiff = orb.targetHue - orb.hue;
+                if (hueDiff > 180) hueDiff -= 360;
+                if (hueDiff < -180) hueDiff += 360;
+                orb.hue = (orb.hue + hueDiff * 0.05 + 360) % 360;
+
+                orb.speed += (orb.targetSpeed + orb.holdLevel * 1.6 - orb.speed) * 0.06;
+                orb.turbulence += (orb.targetTurbulence + orb.holdLevel * 0.14 - orb.turbulence) * 0.06;
+                orb.scale += (orb.targetScale + orb.holdLevel * 0.08 - orb.scale) * 0.06;
+                orb.time += 0.02 * orb.speed;
+
+                // Gentle live telemetry drift every ~1.2s
+                if (orb.frame % 75 === 0) {
+                    const baseIn = hub.traffic.alert ? 5.9 : 1.8;
+                    hub.traffic.inMBs = Math.max(0.5, baseIn + (Math.random() - 0.5) * 0.3);
+                    hub.traffic.outMBs = Math.max(0.3, 0.92 + (Math.random() - 0.5) * 0.2);
+                    hub.traffic.reqPerSec = Math.round((hub.traffic.alert ? 410 : 142) + (Math.random() - 0.5) * 18);
+                    hub.supabase.latencyMs = Math.max(14, 24 + (Math.random() - 0.5) * 4);
+                    renderStoryAndStrip();
+                }
+
+                ctx.clearRect(0, 0, orb.width, orb.height);
+
+                const offsetX = orb.pointerActive ? (orb.pointerX - orb.cx) * 0.05 : 0;
+                const offsetY = orb.pointerActive ? (orb.pointerY - orb.cy) * 0.05 : 0;
+                const cx = orb.cx + offsetX;
+                const cy = orb.cy + offsetY;
+                const breathe = Math.sin(orb.time * 1.5) * 0.028;
+                const radius = orb.baseRadius * (orb.scale + breathe);
+                const hue = orb.hue;
+
+                // Outer ambient glow
+                const aura = ctx.createRadialGradient(cx, cy, radius * 0.2, cx, cy, radius * 2.15);
+                aura.addColorStop(0, `hsla(${hue}, 100%, 58%, 0.34)`);
+                aura.addColorStop(0.5, `hsla(${hue + 10}, 95%, 42%, 0.12)`);
+                aura.addColorStop(1, 'hsla(210, 90%, 20%, 0)');
+                ctx.fillStyle = aura;
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius * 2.15, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Expanding shockwave pulses
+                for (let i = orb.pulses.length - 1; i >= 0; i--) {
+                    const p = orb.pulses[i];
+                    p.radius += 3.6;
+                    p.alpha *= 0.93;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, p.radius, 0, Math.PI * 2);
+                    ctx.strokeStyle = `hsla(${p.hue ?? hue - 8}, 100%, 76%, ${p.alpha})`;
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    if (p.alpha < 0.02 || p.radius > p.maxRadius) orb.pulses.splice(i, 1);
+                }
+
+                // Storytelling visuals (satellites, streams, quota ring, warning arcs)
+                drawStoryVisuals(cx, cy, radius, hue);
+
+                // Plasma Core & 3D Lattice
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+                drawPlasmaLayer(cx, cy, radius * 1.02, 0.0, 0, hue + 8);
+                drawPlasmaLayer(cx, cy, radius * 0.90, 2.2, 1, hue);
+                drawPlasmaLayer(cx, cy, radius * 0.76, 4.1, 2, hue - 10);
+                drawLattice(cx, cy, radius, hue);
+
+                // Bright luminous center core
+                const core = ctx.createRadialGradient(cx - radius * 0.12, cy - radius * 0.14, radius * 0.03, cx, cy, radius * 0.72);
+                core.addColorStop(0, `hsla(${hue - 14}, 100%, 96%, 0.92)`);
+                core.addColorStop(0.35, `hsla(${hue - 4}, 100%, 66%, 0.62)`);
+                core.addColorStop(1, `hsla(${hue + 10}, 100%, 40%, 0)`);
+                ctx.fillStyle = core;
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius * 0.72, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Clean glass rim highlight
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius * 0.95, Math.PI * 1.1, Math.PI * 1.62);
+                ctx.strokeStyle = `hsla(${hue - 16}, 100%, 92%, 0.4)`;
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+                ctx.restore();
 
                 requestAnimationFrame(render);
             }
 
             /**
-             * Event Listeners Setup
+             * Event Listeners
              */
             function bindEvents() {
                 window.addEventListener('resize', resizeCanvas);
 
-                // Pointer / Touch interaction + Hold-to-Charge on the Orb Stage
                 stage.addEventListener('pointermove', (e) => {
                     const rect = stage.getBoundingClientRect();
-                    state.pointerX = e.clientX - rect.left;
-                    state.pointerY = e.clientY - rect.top;
-                    state.pointerActive = true;
+                    orb.pointerX = e.clientX - rect.left;
+                    orb.pointerY = e.clientY - rect.top;
+                    orb.pointerActive = true;
                 });
 
                 stage.addEventListener('pointerdown', () => {
-                    state.isCharging = true;
+                    orb.isHolding = true;
                     if (orbHint) orbHint.classList.add('opacity-0');
                 });
 
-                const releaseCharge = () => {
-                    if (!state.isCharging) return;
-                    state.isCharging = false;
-                    if (state.chargeLevel > 0.35) {
-                        triggerPulse(1.65);
-                        setTimeout(() => triggerPulse(1.15), 140);
-                        showToast(`Overcharge Pulse Released (${Math.round(state.chargeLevel * 100)}%)`);
-                    } else {
-                        triggerPulse(1.0);
-                    }
+                const endHold = () => {
+                    if (!orb.isHolding) return;
+                    orb.isHolding = false;
+                    runSecuritySweep();
                 };
 
-                stage.addEventListener('pointerup', releaseCharge);
-                stage.addEventListener('pointercancel', releaseCharge);
-
+                stage.addEventListener('pointerup', endHold);
+                stage.addEventListener('pointercancel', endHold);
                 stage.addEventListener('pointerleave', () => {
-                    state.pointerActive = false;
-                    if (state.isCharging) releaseCharge();
+                    orb.pointerActive = false;
+                    if (orb.isHolding) endHold();
                 });
 
-                // Mode Buttons
-                modeButtons.forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        setMode(btn.dataset.mode);
-                        triggerPulse();
-                    });
+                focusButtons.forEach(btn => {
+                    btn.addEventListener('click', () => setFocus(btn.dataset.focus));
                 });
 
-                // Pulse Button
-                pulseButton.addEventListener('click', () => {
-                    triggerPulse();
-                    showToast('Energy Pulse Emitted');
+                logToggleBtn.addEventListener('click', () => {
+                    activityDrawer.classList.toggle('hidden');
                 });
 
-                // Settings Drawer Toggle
-                settingsButton.addEventListener('click', () => {
-                    settingsPanel.classList.toggle('hidden');
-                });
+                simAlertBtn.addEventListener('click', simulateAlert);
+                clearFlagsBtn.addEventListener('click', clearAllFlags);
 
-                // Sound Toggle
-                soundButton.addEventListener('click', () => {
-                    state.soundEnabled = !state.soundEnabled;
-                    iconSoundOff.classList.toggle('hidden', state.soundEnabled);
-                    iconSoundOn.classList.toggle('hidden', !state.soundEnabled);
-                    soundLabel.textContent = state.soundEnabled ? 'Audio On' : 'Audio Off';
-                    if (state.soundEnabled) {
+                soundBtn.addEventListener('click', () => {
+                    orb.soundEnabled = !orb.soundEnabled;
+                    iconSoundOff.classList.toggle('hidden', orb.soundEnabled);
+                    iconSoundOn.classList.toggle('hidden', !orb.soundEnabled);
+                    if (orb.soundEnabled) {
                         playTone(520, 0.2);
-                        showToast('Synthesized UI Audio Enabled');
+                        showToast('Audio Enabled');
                     } else {
-                        showToast('UI Audio Muted');
+                        showToast('Audio Muted');
                     }
                 });
 
-                // Parameter Sliders
-                sliderIntensity.addEventListener('input', (e) => {
-                    const val = Number(e.target.value);
-                    state.intensity = val / 100;
-                    valIntensity.textContent = `${val}%`;
-                });
-
-                sliderSpeed.addEventListener('input', (e) => {
-                    const val = Number(e.target.value);
-                    state.speedMultiplier = val / 100;
-                    valSpeed.textContent = `${(val / 100).toFixed(1)}x`;
-                });
-
-                sliderHue.addEventListener('input', (e) => {
-                    const val = Number(e.target.value);
-                    state.hue = val;
-                    valHue.textContent = `${val}°`;
-                });
-
-                sliderDetail.addEventListener('input', (e) => {
-                    const val = Number(e.target.value);
-                    state.detailLevel = val / 100;
-                    valDetail.textContent = `${val}%`;
-                });
-
-                toggleHud.addEventListener('change', (e) => {
-                    state.showHud = e.target.checked;
-                    hudOverlays.forEach(el => el.classList.toggle('hidden', !state.showHud));
-                });
-
-                resetParamsButton.addEventListener('click', () => {
-                    sliderIntensity.value = 100;
-                    sliderSpeed.value = 100;
-                    sliderHue.value = 205;
-                    sliderDetail.value = 100;
-                    toggleHud.checked = true;
-                    state.intensity = 1.0;
-                    state.speedMultiplier = 1.0;
-                    state.hue = 205;
-                    state.detailLevel = 1.0;
-                    state.showHud = true;
-                    hudOverlays.forEach(el => el.classList.remove('hidden'));
-                    valIntensity.textContent = '100%';
-                    valSpeed.textContent = '1.0x';
-                    valHue.textContent = '205°';
-                    valDetail.textContent = '100%';
-                    showToast('Core Parameters Reset');
-                });
-
-                // Simulated Command Transmission
                 commandForm.addEventListener('submit', (e) => {
                     e.preventDefault();
                     const text = commandInput.value.trim();
                     if (!text) return;
-
                     commandInput.value = '';
-                    clearTimeout(state.commandTimer);
-
-                    // Transition: Thinking -> Speaking -> Idle
-                    setMode('thinking', `"Processing transmission: '${text}'..."`);
-                    triggerPulse();
-
-                    state.commandTimer = setTimeout(() => {
-                        setMode('speaking', `"Signal received: '${text}'. Core harmonics adjusted and ready."`);
-                        triggerPulse();
-
-                        state.commandTimer = setTimeout(() => {
-                            setMode('idle');
-                        }, 4200);
-                    }, 1600);
+                    handleQuery(text);
                 });
             }
 
-            // Initialize cleanly after window load
             window.onload = function () {
                 resizeCanvas();
-                initParticles();
+                initVisualGeometry();
+                syncOrbVisualStory();
+                renderStoryAndStrip();
+                renderLogList();
                 bindEvents();
                 render();
             };
