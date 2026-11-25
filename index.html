@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CABGCU Database</title>
+    <!-- Load Tailwind CSS for responsive utility styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Inter font for clean, modern typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-black text-slate-100 font-sans antialiased overflow-x-hidden min-h-screen flex flex-col justify-between selection:bg-sky-500/30 selection:text-sky-200">
+
+    <!-- Top Navigation / Status Header -->
+    <header class="relative z-20 w-full max-w-6xl mx-auto px-4 sm:px-6 pt-5 pb-2 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-3 h-3 rounded-full bg-sky-400 shadow-[0_0_12px_rgba(56,189,248,0.9)] animate-pulse"></div>
+            <div>
+                <h1 class="text-sm sm:text-base font-semibold tracking-wider uppercase text-sky-100">CABGCU Database</h1>
+                <p id="status-subtitle" class="text-xs text-sky-400/80 font-medium">Database Ready • Idle Mode</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2 sm:gap-3">
+            <!-- Audio Synth Toggle -->
+            <button id="btn-sound" type="button" aria-label="Toggle UI Sound Effects"
+                class="p-2.5 sm:px-3.5 sm:py-2 rounded-xl bg-black/80 hover:bg-zinc-900/90 border border-sky-500/20 text-sky-300 text-xs font-medium transition-all flex items-center gap-2 backdrop-blur-md active:scale-95">
+                <svg id="icon-sound-off" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                </svg>
+                <svg id="icon-sound-on" class="w-4 h-4 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                </svg>
+                <span class="hidden sm:inline" id="sound-label">Audio Off</span>
+            </button>
+
+            <!-- Settings Drawer Toggle -->
+            <button id="btn-settings" type="button" aria-label="Toggle Orb Controls"
+                class="p-2.5 sm:px-3.5 sm:py-2 rounded-xl bg-black/80 hover:bg-zinc-900/90 border border-sky-500/20 text-sky-300 text-xs font-medium transition-all flex items-center gap-2 backdrop-blur-md active:scale-95">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                </svg>
+                <span class="hidden sm:inline">Tune Orb</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Non-blocking Toast / Message Box -->
+    <div id="toast-box" class="fixed top-20 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-opacity duration-300">
+        <div class="px-4 py-2 rounded-full bg-sky-950/90 border border-sky-400/40 text-sky-100 text-xs sm:text-sm font-medium shadow-[0_0_20px_rgba(14,165,233,0.3)] backdrop-blur-md">
+            <span id="toast-message">Orb Pulse Triggered</span>
+        </div>
+    </div>
+
+    <!-- Main Interactive Blue Orb Stage -->
+    <main class="relative flex-1 flex flex-col items-center justify-center w-full px-4 my-2">
+        <!-- Responsive Canvas Container with Precision Telemetry Overlays -->
+        <div id="orb-stage" class="relative w-full max-w-3xl h-[50vh] min-h-[320px] max-h-[560px] flex items-center justify-center cursor-pointer select-none touch-none">
+            <canvas id="orb-canvas" class="w-full h-full block"></canvas>
+
+            <!-- Top-Left Telemetry Readout -->
+            <div class="hud-overlay pointer-events-none absolute top-2 left-2 sm:left-4 flex flex-col gap-1 px-3 py-2 rounded-xl bg-black/70 border border-sky-500/20 backdrop-blur-md text-[10px] sm:text-xs font-mono">
+                <div class="flex items-center gap-2 text-sky-400/80 uppercase tracking-wider">
+                    <span class="w-1.5 h-1.5 rounded-full bg-sky-400 animate-ping"></span>
+                    <span>Harmonic Freq</span>
+                </div>
+                <div class="text-sky-100 font-semibold text-xs sm:text-sm"><span id="metric-freq">432.0</span> <span class="text-sky-400/70 text-[10px]">Hz</span></div>
+                <div class="text-slate-400 text-[10px]">Flux: <span id="metric-flux" class="text-sky-300">99.4%</span></div>
+            </div>
+
+            <!-- Top-Right Telemetry Readout -->
+            <div class="hud-overlay pointer-events-none absolute top-2 right-2 sm:right-4 flex flex-col items-end gap-1 px-3 py-2 rounded-xl bg-black/70 border border-sky-500/20 backdrop-blur-md text-[10px] sm:text-xs font-mono">
+                <div class="text-sky-400/80 uppercase tracking-wider">Core Matrix</div>
+                <div class="text-sky-100 font-semibold text-xs sm:text-sm"><span id="metric-temp">318.4</span> <span class="text-sky-400/70 text-[10px]">K</span></div>
+                <div class="text-slate-400 text-[10px]">Load: <span id="metric-load" class="text-sky-300">14%</span></div>
+            </div>
+
+            <!-- Subtle Center Hint Overlay (fades out after first interaction) -->
+            <div id="orb-hint" class="pointer-events-none absolute bottom-2 px-3 py-1 rounded-full bg-black/70 border border-sky-500/20 text-[11px] text-sky-300/80 backdrop-blur-sm transition-opacity duration-500">
+                Tap to pulse • Hold to charge • Move pointer to bend field
+            </div>
+        </div>
+
+        <!-- Live Assistant / Telemetry Transcript -->
+        <div class="relative z-20 w-full max-w-xl text-center mt-2 px-2">
+            <p id="orb-response" class="text-sm sm:text-base text-sky-100/90 font-light tracking-wide min-h-[2.5rem] transition-all duration-300">
+                "CABGCU Database online. Select a mode below or submit a query."
+            </p>
+        </div>
+
+        <!-- Collapsible Customization Panel -->
+        <aside id="settings-panel" class="hidden relative z-30 w-full max-w-2xl mt-3 p-4 sm:p-5 rounded-2xl bg-zinc-950/90 border border-sky-500/25 shadow-[0_0_30px_rgba(2,132,199,0.2)] backdrop-blur-xl">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-xs font-semibold uppercase tracking-wider text-sky-300">Plasma Core Parameters</h2>
+                <div class="flex items-center gap-3">
+                    <label class="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer select-none">
+                        <input id="toggle-hud" type="checkbox" checked class="accent-sky-400 rounded cursor-pointer">
+                        <span>HUD Details</span>
+                    </label>
+                    <button id="btn-reset-params" type="button" class="text-xs text-slate-400 hover:text-sky-300 transition-colors">Reset Defaults</button>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Glow Intensity Slider -->
+                <div class="flex flex-col gap-1.5">
+                    <div class="flex justify-between text-xs text-slate-300">
+                        <label for="slider-intensity">Luminosity</label>
+                        <span id="val-intensity" class="text-sky-400 font-mono">100%</span>
+                    </div>
+                    <input id="slider-intensity" type="range" min="40" max="150" value="100"
+                        class="w-full accent-sky-400 bg-slate-800 rounded-lg cursor-pointer h-2">
+                </div>
+
+                <!-- Turbulence / Speed Slider -->
+                <div class="flex flex-col gap-1.5">
+                    <div class="flex justify-between text-xs text-slate-300">
+                        <label for="slider-speed">Energy Flow</label>
+                        <span id="val-speed" class="text-sky-400 font-mono">1.0x</span>
+                    </div>
+                    <input id="slider-speed" type="range" min="30" max="250" value="100"
+                        class="w-full accent-sky-400 bg-slate-800 rounded-lg cursor-pointer h-2">
+                </div>
+
+                <!-- Hue Shift Slider (Deep Cobalt to Ice Cyan) -->
+                <div class="flex flex-col gap-1.5">
+                    <div class="flex justify-between text-xs text-slate-300">
+                        <label for="slider-hue">Blue Spectrum</label>
+                        <span id="val-hue" class="text-sky-400 font-mono">205°</span>
+                    </div>
+                    <input id="slider-hue" type="range" min="185" max="235" value="205"
+                        class="w-full accent-sky-400 bg-slate-800 rounded-lg cursor-pointer h-2">
+                </div>
+
+                <!-- Plasma Arc & Detail Density Slider -->
+                <div class="flex flex-col gap-1.5">
+                    <div class="flex justify-between text-xs text-slate-300">
+                        <label for="slider-detail">Arc & Lattice</label>
+                        <span id="val-detail" class="text-sky-400 font-mono">100%</span>
+                    </div>
+                    <input id="slider-detail" type="range" min="0" max="150" value="100"
+                        class="w-full accent-sky-400 bg-slate-800 rounded-lg cursor-pointer h-2">
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Bottom Interactive Dock -->
+    <footer class="relative z-20 w-full max-w-2xl mx-auto px-4 pb-6 pt-2 flex flex-col gap-3">
+        <!-- State Selector Buttons -->
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 p-2 rounded-2xl bg-zinc-950/80 border border-sky-500/20 backdrop-blur-xl shadow-lg">
+            <button data-mode="idle" type="button"
+                class="mode-btn p-3 rounded-xl text-xs sm:text-sm font-medium transition-all active:scale-95 bg-sky-500/25 text-sky-200 border border-sky-400/40 shadow-[0_0_15px_rgba(56,189,248,0.2)]">
+                Idle
+            </button>
+            <button data-mode="listening" type="button"
+                class="mode-btn p-3 rounded-xl text-xs sm:text-sm font-medium transition-all active:scale-95 bg-zinc-900/70 text-slate-300 hover:bg-zinc-800 border border-transparent">
+                Listening
+            </button>
+            <button data-mode="thinking" type="button"
+                class="mode-btn p-3 rounded-xl text-xs sm:text-sm font-medium transition-all active:scale-95 bg-zinc-900/70 text-slate-300 hover:bg-zinc-800 border border-transparent">
+                Thinking
+            </button>
+            <button data-mode="speaking" type="button"
+                class="mode-btn p-3 rounded-xl text-xs sm:text-sm font-medium transition-all active:scale-95 bg-zinc-900/70 text-slate-300 hover:bg-zinc-800 border border-transparent">
+                Speaking
+            </button>
+            <button id="btn-pulse" type="button"
+                class="col-span-2 sm:col-span-1 p-3 rounded-xl text-xs sm:text-sm font-semibold transition-all active:scale-95 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white shadow-[0_0_18px_rgba(14,165,233,0.45)]">
+                Pulse
+            </button>
+        </div>
+
+        <!-- Simulated Command Input Bar -->
+        <form id="command-form" class="flex items-center gap-2 p-1.5 rounded-2xl bg-zinc-950/85 border border-sky-500/20 focus-within:border-sky-400/60 focus-within:shadow-[0_0_20px_rgba(56,189,248,0.2)] transition-all backdrop-blur-xl">
+            <input id="command-input" type="text" autocomplete="off" placeholder="Query the CABGCU Database..."
+                class="flex-1 bg-transparent px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-400 focus:outline-none">
+            <button type="submit"
+                class="px-4 py-2.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/30 text-sky-200 text-xs sm:text-sm font-medium transition-all active:scale-95">
+                Transmit
+            </button>
+        </form>
+    </footer>
+
+    <!-- Core Blue Orb Graphics & Interaction Logic (JavaScript) -->
+    <script>
+        (function () {
+            'use strict';
+
+            // Core DOM References
+            const canvas = document.getElementById('orb-canvas');
+            const ctx = canvas.getContext('2d');
+            const stage = document.getElementById('orb-stage');
+            const statusSubtitle = document.getElementById('status-subtitle');
+            const orbResponse = document.getElementById('orb-response');
+            const orbHint = document.getElementById('orb-hint');
+            const settingsPanel = document.getElementById('settings-panel');
+            const modeButtons = document.querySelectorAll('.mode-btn');
+            const pulseButton = document.getElementById('btn-pulse');
+            const settingsButton = document.getElementById('btn-settings');
+            const soundButton = document.getElementById('btn-sound');
+            const iconSoundOff = document.getElementById('icon-sound-off');
+            const iconSoundOn = document.getElementById('icon-sound-on');
+            const soundLabel = document.getElementById('sound-label');
+            const resetParamsButton = document.getElementById('btn-reset-params');
+            const commandForm = document.getElementById('command-form');
+            const commandInput = document.getElementById('command-input');
+            const toastBox = document.getElementById('toast-box');
+            const toastMessage = document.getElementById('toast-message');
+
+            // Sliders & Telemetry Readouts
+            const sliderIntensity = document.getElementById('slider-intensity');
+            const sliderSpeed = document.getElementById('slider-speed');
+            const sliderHue = document.getElementById('slider-hue');
+            const sliderDetail = document.getElementById('slider-detail');
+            const toggleHud = document.getElementById('toggle-hud');
+            const hudOverlays = document.querySelectorAll('.hud-overlay');
+            const valIntensity = document.getElementById('val-intensity');
+            const valSpeed = document.getElementById('val-speed');
+            const valHue = document.getElementById('val-hue');
+            const valDetail = document.getElementById('val-detail');
+
+            const metricFreq = document.getElementById('metric-freq');
+            const metricFlux = document.getElementById('metric-flux');
+            const metricTemp = document.getElementById('metric-temp');
+            const metricLoad = document.getElementById('metric-load');
+
+            // Application State
+            const state = {
+                mode: 'idle', // 'idle' | 'listening' | 'thinking' | 'speaking'
+                width: 0,
+                height: 0,
+                cx: 0,
+                cy: 0,
+                baseRadius: 100,
+                time: 0,
+                frameCount: 0,
+                // Smoothly interpolated animation parameters
+                currentSpeed: 1.0,
+                targetSpeed: 1.0,
+                currentTurbulence: 0.14,
+                targetTurbulence: 0.14,
+                currentScale: 1.0,
+                targetScale: 1.0,
+                // User-tunable parameters
+                intensity: 1.0,
+                speedMultiplier: 1.0,
+                hue: 205,
+                detailLevel: 1.0,
+                showHud: true,
+                // Pointer tracking & Hold-to-Charge state
+                pointerX: 0,
+                pointerY: 0,
+                pointerActive: false,
+                isCharging: false,
+                chargeLevel: 0,
+                // Visual subsystems
+                pulses: [],
+                particles: [],
+                bgStars: [],
+                latticeNodes: [],
+                spectrumBars: new Float32Array(64),
+                // Audio toggle
+                soundEnabled: false,
+                audioCtx: null,
+                toastTimer: null,
+                commandTimer: null
+            };
+
+            // Mode Presets Configuration
+            const MODE_CONFIG = {
+                idle: {
+                    label: 'Database Ready • Idle Mode',
+                    speed: 0.85,
+                    turbulence: 0.12,
+                    scale: 1.0,
+                    baseFreq: 432,
+                    baseLoad: 14,
+                    baseTemp: 318,
+                    quote: '"CABGCU Database online. Select a mode below or submit a query."'
+                },
+                listening: {
+                    label: 'Acoustic Sensors Active • Listening',
+                    speed: 1.35,
+                    turbulence: 0.24,
+                    scale: 1.08,
+                    baseFreq: 528,
+                    baseLoad: 42,
+                    baseTemp: 334,
+                    quote: '"Listening closely... acoustic waveforms locked onto your frequency."'
+                },
+                thinking: {
+                    label: 'CABGCU Core Engaged • Querying',
+                    speed: 2.5,
+                    turbulence: 0.34,
+                    scale: 0.96,
+                    baseFreq: 741,
+                    baseLoad: 88,
+                    baseTemp: 372,
+                    quote: '"Indexing CABGCU Database records and evaluating optimal results..."'
+                },
+                speaking: {
+                    label: 'Vocal Matrix Active • Transmitting',
+                    speed: 1.75,
+                    turbulence: 0.28,
+                    scale: 1.06,
+                    baseFreq: 639,
+                    baseLoad: 64,
+                    baseTemp: 351,
+                    quote: '"Transmission clear. All CABGCU Database telemetry streams are nominal."'
+                }
+            };
+
+            /**
+             * Displays a clean, non-blocking toast notification.
+             */
+            function showToast(message) {
+                toastMessage.textContent = message;
+                toastBox.classList.remove('opacity-0');
+                toastBox.classList.add('opacity-100');
+                clearTimeout(state.toastTimer);
+                state.toastTimer = setTimeout(() => {
+                    toastBox.classList.remove('opacity-100');
+                    toastBox.classList.add('opacity-0');
+                }, 2000);
+            }
+
+            /**
+             * Plays a gentle futuristic sine chime using Web Audio API when audio is enabled.
+             */
+            function playTone(freq = 440, duration = 0.25, type = 'sine') {
+                if (!state.soundEnabled) return;
+                try {
+                    if (!state.audioCtx) {
+                        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                        state.audioCtx = new AudioContextClass();
+                    }
+                    if (state.audioCtx.state === 'suspended') {
+                        state.audioCtx.resume();
+                    }
+                    const osc = state.audioCtx.createOscillator();
+                    const gain = state.audioCtx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, state.audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(freq * 1.25, state.audioCtx.currentTime + duration);
+
+                    gain.gain.setValueAtTime(0.08, state.audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, state.audioCtx.currentTime + duration);
+
+                    osc.connect(gain);
+                    gain.connect(state.audioCtx.destination);
+                    osc.start();
+                    osc.stop(state.audioCtx.currentTime + duration);
+                } catch (err) {
+                    console.warn('Web Audio unavailable:', err);
+                }
+            }
+
+            /**
+             * Initializes orbiting energy particles, ambient background starfield,
+             * and a 3D Fibonacci sphere lattice for the holographic interior.
+             */
+            function initParticles() {
+                state.particles = [];
+                const count = 64;
+                for (let i = 0; i < count; i++) {
+                    state.particles.push({
+                        angle: Math.random() * Math.PI * 2,
+                        orbitFactor: 1.06 + Math.random() * 0.78,
+                        speed: (0.003 + Math.random() * 0.011) * (Math.random() > 0.5 ? 1 : -1),
+                        size: 1.0 + Math.random() * 2.4,
+                        alpha: 0.25 + Math.random() * 0.7,
+                        wobblePhase: Math.random() * Math.PI * 2,
+                        isBright: Math.random() > 0.75
+                    });
+                }
+
+                // Ambient background micro-dust for depth
+                state.bgStars = [];
+                for (let i = 0; i < 45; i++) {
+                    state.bgStars.push({
+                        nx: Math.random(),
+                        ny: Math.random(),
+                        size: 0.6 + Math.random() * 1.4,
+                        alpha: 0.08 + Math.random() * 0.25,
+                        twinkleSpeed: 0.5 + Math.random() * 1.8,
+                        phase: Math.random() * Math.PI * 2
+                    });
+                }
+
+                // 3D Fibonacci Sphere Lattice Nodes (gives genuine volumetric depth)
+                state.latticeNodes = [];
+                const nodeCount = 54;
+                const goldenRatio = (1 + Math.sqrt(5)) / 2;
+                for (let i = 0; i < nodeCount; i++) {
+                    const theta = (2 * Math.PI * i) / goldenRatio;
+                    const phi = Math.acos(1 - (2 * (i + 0.5)) / nodeCount);
+                    state.latticeNodes.push({
+                        x: Math.sin(phi) * Math.cos(theta),
+                        y: Math.cos(phi),
+                        z: Math.sin(phi) * Math.sin(theta)
+                    });
+                }
+            }
+
+            /**
+             * Resizes the canvas to match its responsive container with sharp DPR scaling.
+             */
+            function resizeCanvas() {
+                const rect = stage.getBoundingClientRect();
+                const dpr = Math.min(window.devicePixelRatio || 1, 2);
+                state.width = rect.width;
+                state.height = rect.height;
+                canvas.width = Math.floor(rect.width * dpr);
+                canvas.height = Math.floor(rect.height * dpr);
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+                state.cx = state.width / 2;
+                state.cy = state.height / 2;
+                state.baseRadius = Math.min(state.width, state.height) * 0.27;
+            }
+
+            /**
+             * Switches the active mode of the Blue Orb and updates UI styling.
+             */
+            function setMode(newMode, customQuote) {
+                const cfg = MODE_CONFIG[newMode] || MODE_CONFIG.idle;
+                state.mode = newMode;
+                state.targetSpeed = cfg.speed;
+                state.targetTurbulence = cfg.turbulence;
+                state.targetScale = cfg.scale;
+
+                statusSubtitle.textContent = cfg.label;
+                orbResponse.textContent = customQuote || cfg.quote;
+
+                // Update button active states
+                modeButtons.forEach(btn => {
+                    const isActive = btn.dataset.mode === newMode;
+                    if (isActive) {
+                        btn.className = 'mode-btn p-3 rounded-xl text-xs sm:text-sm font-medium transition-all active:scale-95 bg-sky-500/25 text-sky-200 border border-sky-400/40 shadow-[0_0_15px_rgba(56,189,248,0.2)]';
+                    } else {
+                        btn.className = 'mode-btn p-3 rounded-xl text-xs sm:text-sm font-medium transition-all active:scale-95 bg-zinc-900/70 text-slate-300 hover:bg-zinc-800 border border-transparent';
+                    }
+                });
+
+                const toneMap = { idle: 320, listening: 480, thinking: 600, speaking: 520 };
+                playTone(toneMap[newMode] || 400, 0.22);
+            }
+
+            /**
+             * Triggers an expanding glowing energy shockwave from the orb core.
+             */
+            function triggerPulse(strength = 1.0) {
+                state.pulses.push({
+                    radius: state.baseRadius * 0.85,
+                    maxRadius: state.baseRadius * (2.3 + strength * 0.6),
+                    alpha: Math.min(1, 0.85 * strength),
+                    lineWidth: 2.0 + strength * 1.4
+                });
+                playTone(240 + strength * 40, 0.35, 'triangle');
+                if (orbHint) orbHint.classList.add('opacity-0');
+            }
+
+            /**
+             * Draws subtle floating background bokeh/starfield particles.
+             */
+            function drawBackgroundField(hue) {
+                for (let i = 0; i < state.bgStars.length; i++) {
+                    const s = state.bgStars[i];
+                    const twinkle = 0.55 + 0.45 * Math.sin(state.time * s.twinkleSpeed + s.phase);
+                    const x = s.nx * state.width;
+                    const y = s.ny * state.height;
+                    ctx.fillStyle = `hsla(${hue - 8}, 90%, 78%, ${s.alpha * twinkle * state.intensity})`;
+                    ctx.beginPath();
+                    ctx.arc(x, y, s.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            /**
+             * Draws a precision holographic HUD reticle with degree ticks & rotating scanner arcs.
+             */
+            function drawHudReticle(cx, cy, radius, hue) {
+                if (!state.showHud) return;
+
+                ctx.save();
+                ctx.translate(cx, cy);
+
+                const outerR = radius * 1.56;
+                const innerR = radius * 1.32;
+                const baseAlpha = 0.22 * state.intensity;
+
+                // Fine outer compass circle
+                ctx.beginPath();
+                ctx.arc(0, 0, outerR, 0, Math.PI * 2);
+                ctx.strokeStyle = `hsla(${hue}, 100%, 70%, ${baseAlpha * 0.6})`;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // 72 precision degree ticks rotating slowly
+                ctx.save();
+                ctx.rotate(state.time * 0.08);
+                for (let i = 0; i < 72; i++) {
+                    const angle = (i / 72) * Math.PI * 2;
+                    const isMajor = i % 6 === 0;
+                    const tickLen = isMajor ? 9 : 4;
+                    const r1 = outerR - tickLen;
+                    const r2 = outerR;
+                    ctx.beginPath();
+                    ctx.moveTo(Math.cos(angle) * r1, Math.sin(angle) * r1);
+                    ctx.lineTo(Math.cos(angle) * r2, Math.sin(angle) * r2);
+                    ctx.strokeStyle = `hsla(${hue - 10}, 100%, ${isMajor ? 80 : 65}%, ${isMajor ? baseAlpha * 1.8 : baseAlpha * 0.8})`;
+                    ctx.lineWidth = isMajor ? 1.5 : 1;
+                    ctx.stroke();
+                }
+                ctx.restore();
+
+                // Counter-rotating segmented scanner arcs
+                ctx.save();
+                ctx.rotate(-state.time * 0.28);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = `hsla(${hue - 15}, 100%, 75%, ${baseAlpha * 2.1})`;
+                for (let s = 0; s < 3; s++) {
+                    const start = s * ((Math.PI * 2) / 3);
+                    ctx.beginPath();
+                    ctx.arc(0, 0, innerR, start, start + 0.55);
+                    ctx.stroke();
+                }
+                ctx.restore();
+
+                // Charge progress ring when holding down the orb
+                if (state.chargeLevel > 0.02) {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, outerR + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * state.chargeLevel);
+                    ctx.strokeStyle = `hsla(${hue - 18}, 100%, 82%, ${0.85 * state.intensity})`;
+                    ctx.lineWidth = 3;
+                    ctx.lineCap = 'round';
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+
+            /**
+             * Draws a 64-bar radial harmonic spectrum visualizer around the orb perimeter.
+             */
+            function drawSpectrumRing(cx, cy, radius, hue) {
+                const count = state.spectrumBars.length;
+                const baseR = radius * 1.13;
+                const t = state.time;
+
+                ctx.save();
+                ctx.translate(cx, cy);
+
+                for (let i = 0; i < count; i++) {
+                    const angle = (i / count) * Math.PI * 2 - Math.PI / 2;
+                    let targetVal = 0.12;
+
+                    if (state.mode === 'idle') {
+                        targetVal = 0.08 + 0.08 * Math.sin(t * 2.2 + i * 0.35);
+                    } else if (state.mode === 'listening') {
+                        targetVal = 0.15 + 0.35 * Math.abs(Math.sin(t * 3.8 + i * 0.5)) * Math.cos(t * 1.4 - i * 0.2);
+                    } else if (state.mode === 'thinking') {
+                        const scanner = Math.max(0, Math.cos(angle - t * 3.5));
+                        targetVal = 0.12 + Math.pow(scanner, 4) * 0.65;
+                    } else if (state.mode === 'speaking') {
+                        targetVal = 0.18 + 0.55 * Math.abs(Math.sin(t * 7.5 + i * 0.65) * Math.cos(t * 3.1 + i * 0.25));
+                    }
+
+                    targetVal += state.chargeLevel * 0.45;
+                    state.spectrumBars[i] += (targetVal - state.spectrumBars[i]) * 0.18;
+
+                    const barHeight = Math.max(2, state.spectrumBars[i] * radius * 0.32 * state.detailLevel);
+                    const x1 = Math.cos(angle) * baseR;
+                    const y1 = Math.sin(angle) * baseR;
+                    const x2 = Math.cos(angle) * (baseR + barHeight);
+                    const y2 = Math.sin(angle) * (baseR + barHeight);
+
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    ctx.strokeStyle = `hsla(${hue - 10}, 100%, 74%, ${(0.28 + state.spectrumBars[i] * 0.65) * state.intensity})`;
+                    ctx.lineWidth = 2;
+                    ctx.lineCap = 'round';
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+
+            /**
+             * Projects and renders a rotating 3D holographic energy lattice inside the orb.
+             */
+            function draw3DLattice(cx, cy, radius, hue) {
+                if (state.detailLevel <= 0.05) return;
+
+                const rotY = state.time * 0.45;
+                const rotX = Math.sin(state.time * 0.3) * 0.38 + (state.pointerActive ? (state.pointerY - state.cy) * 0.0018 : 0);
+                const cosY = Math.cos(rotY);
+                const sinY = Math.sin(rotY);
+                const cosX = Math.cos(rotX);
+                const sinX = Math.sin(rotX);
+
+                const projected = [];
+                const sphereR = radius * 0.86;
+
+                for (let i = 0; i < state.latticeNodes.length; i++) {
+                    const n = state.latticeNodes[i];
+                    // Rotate around Y
+                    const x1 = n.x * cosY - n.z * sinY;
+                    const z1 = n.z * cosY + n.x * sinY;
+                    // Rotate around X
+                    const y2 = n.y * cosX - z1 * sinX;
+                    const z2 = z1 * cosX + n.y * sinX;
+
+                    // Perspective projection
+                    const depth = (z2 + 1.8) / 2.8;
+                    projected.push({
+                        x: cx + x1 * sphereR,
+                        y: cy + y2 * sphereR,
+                        z: z2,
+                        depth
+                    });
+                }
+
+                // Draw connecting neural filaments between nearby 3D nodes
+                const maxDistSq = (sphereR * 0.56) * (sphereR * 0.56);
+                ctx.lineWidth = 0.85;
+                for (let i = 0; i < projected.length; i++) {
+                    const a = projected[i];
+                    if (a.z < -0.25) continue; // Cull far back-face clutter
+                    for (let j = i + 1; j < projected.length; j++) {
+                        const b = projected[j];
+                        if (b.z < -0.25) continue;
+                        const dx = a.x - b.x;
+                        const dy = a.y - b.y;
+                        const d2 = dx * dx + dy * dy;
+                        if (d2 < maxDistSq) {
+                            const alpha = (1 - d2 / maxDistSq) * 0.34 * a.depth * state.detailLevel * state.intensity;
+                            ctx.strokeStyle = `hsla(${hue - 12}, 100%, 78%, ${alpha})`;
+                            ctx.beginPath();
+                            ctx.moveTo(a.x, a.y);
+                            ctx.lineTo(b.x, b.y);
+                            ctx.stroke();
+                        }
+                    }
+                }
+
+                // Draw glowing lattice vertices
+                for (let i = 0; i < projected.length; i++) {
+                    const p = projected[i];
+                    if (p.z < -0.35) continue;
+                    const alpha = Math.max(0.05, p.depth * 0.72 * state.detailLevel * state.intensity);
+                    ctx.fillStyle = `hsla(${hue - 18}, 100%, 88%, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 1.1 + p.depth * 1.4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            /**
+             * Draws procedural electric plasma arcs crackling across the orb surface.
+             */
+            function drawPlasmaArcs(cx, cy, radius, hue) {
+                if (state.detailLevel <= 0.1) return;
+
+                const arcCount = Math.round(
+                    (state.mode === 'thinking' ? 5 : state.mode === 'speaking' ? 4 : 2) * state.detailLevel +
+                    state.chargeLevel * 4
+                );
+
+                for (let a = 0; a < arcCount; a++) {
+                    const seed = Math.floor(state.time * 12) + a * 31;
+                    const startAngle = ((seed * 1.618) % 1) * Math.PI * 2;
+                    const span = 0.55 + ((seed * 0.73) % 0.85);
+                    const segments = 9;
+
+                    ctx.beginPath();
+                    for (let s = 0; s <= segments; s++) {
+                        const frac = s / segments;
+                        const ang = startAngle + frac * span;
+                        // Taper displacement at endpoints so arcs anchor cleanly inside the sphere
+                        const envelope = Math.sin(frac * Math.PI);
+                        const jitter = Math.sin(state.time * 18 + s * 2.7 + a * 4.1) * radius * 0.14 * envelope;
+                        const r = radius * (0.72 + envelope * 0.24) + jitter;
+                        const x = cx + Math.cos(ang) * r;
+                        const y = cy + Math.sin(ang) * r;
+                        if (s === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+
+                    ctx.strokeStyle = `hsla(${hue - 20}, 100%, 86%, ${(0.35 + state.chargeLevel * 0.45) * state.intensity})`;
+                    ctx.lineWidth = 1.2 + state.chargeLevel * 1.1;
+                    ctx.stroke();
+                }
+            }
+
+            /**
+             * Updates the live HUD telemetry metrics every few frames.
+             */
+            function updateTelemetry() {
+                if (state.frameCount % 8 !== 0) return;
+                const cfg = MODE_CONFIG[state.mode] || MODE_CONFIG.idle;
+                const jitter = Math.sin(state.time * 2.7);
+                const chargeBoost = state.chargeLevel;
+
+                const freq = cfg.baseFreq * state.speedMultiplier + jitter * 4.2 + chargeBoost * 180;
+                const flux = Math.max(82.0, Math.min(99.9, 99.4 - state.currentTurbulence * 12 + jitter * 0.3 - chargeBoost * 4.5));
+                const temp = cfg.baseTemp + jitter * 1.8 + chargeBoost * 68 + (state.intensity - 1) * 18;
+                const load = Math.min(100, Math.round(cfg.baseLoad * state.speedMultiplier + jitter * 3 + chargeBoost * 40));
+
+                metricFreq.textContent = freq.toFixed(1);
+                metricFlux.textContent = `${flux.toFixed(1)}%`;
+                metricTemp.textContent = temp.toFixed(1);
+                metricLoad.textContent = `${load}%`;
+            }
+
+            /**
+             * Draws an organic, undulating plasma wave layer inside the orb.
+             */
+            function drawPlasmaLayer(cx, cy, radius, phaseOffset, layerIndex, hue) {
+                const points = 72;
+                const turb = state.currentTurbulence;
+                const t = state.time;
+
+                ctx.beginPath();
+                for (let i = 0; i <= points; i++) {
+                    const angle = (i / points) * Math.PI * 2;
+                    // Multi-harmonic sine distortion for smooth liquid-energy movement
+                    const wave1 = Math.sin(angle * 3 + t * 1.4 + phaseOffset) * turb;
+                    const wave2 = Math.cos(angle * 5 - t * 1.9 + layerIndex) * (turb * 0.55);
+                    const speakMod = state.mode === 'speaking'
+                        ? Math.sin(t * 9 + angle * 2) * 0.08
+                        : 0;
+
+                    const r = radius * (1 + wave1 + wave2 + speakMod);
+                    const x = cx + Math.cos(angle) * r;
+                    const y = cy + Math.sin(angle) * r;
+
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+
+                const grad = ctx.createRadialGradient(
+                    cx - radius * 0.2,
+                    cy - radius * 0.2,
+                    radius * 0.05,
+                    cx,
+                    cy,
+                    radius * 1.25
+                );
+                const lightness = Math.min(92, 62 + layerIndex * 10);
+                const alphaCore = Math.min(0.95, 0.45 * state.intensity);
+
+                grad.addColorStop(0, `hsla(${hue - 12}, 100%, ${lightness}%, ${alphaCore})`);
+                grad.addColorStop(0.6, `hsla(${hue}, 95%, 52%, ${0.28 * state.intensity})`);
+                grad.addColorStop(1, `hsla(${hue + 18}, 90%, 35%, 0)`);
+
+                ctx.fillStyle = grad;
+                ctx.fill();
+            }
+
+            /**
+             * Main animation render loop.
+             */
+            function render() {
+                try {
+                    state.frameCount++;
+
+                    // Update Hold-to-Charge progression
+                    if (state.isCharging) {
+                        state.chargeLevel = Math.min(1, state.chargeLevel + 0.018);
+                    } else {
+                        state.chargeLevel = Math.max(0, state.chargeLevel - 0.05);
+                    }
+
+                    // Smoothly interpolate parameters toward mode targets
+                    state.currentSpeed += (state.targetSpeed + state.chargeLevel * 2.2 - state.currentSpeed) * 0.06;
+                    state.currentTurbulence += (state.targetTurbulence + state.chargeLevel * 0.22 - state.currentTurbulence) * 0.06;
+                    state.currentScale += (state.targetScale + state.chargeLevel * 0.12 - state.currentScale) * 0.06;
+
+                    state.time += 0.022 * state.currentSpeed * state.speedMultiplier;
+
+                    ctx.clearRect(0, 0, state.width, state.height);
+
+                    // Subtle magnetic shift toward user pointer
+                    let offsetX = 0;
+                    let offsetY = 0;
+                    if (state.pointerActive) {
+                        offsetX = (state.pointerX - state.cx) * 0.065;
+                        offsetY = (state.pointerY - state.cy) * 0.065;
+                    }
+
+                    const cx = state.cx + offsetX;
+                    const cy = state.cy + offsetY;
+                    const breathe = Math.sin(state.time * 1.6) * 0.032;
+                    const radius = state.baseRadius * (state.currentScale + breathe);
+                    const hue = state.hue;
+
+                    // 0. Ambient Background Micro-Dust Field
+                    drawBackgroundField(hue);
+
+                    // 1. Deep Ambient Outer Aura
+                    const auraGrad = ctx.createRadialGradient(cx, cy, radius * 0.2, cx, cy, radius * 2.25);
+                    auraGrad.addColorStop(0, `hsla(${hue}, 100%, 60%, ${(0.34 + state.chargeLevel * 0.22) * state.intensity})`);
+                    auraGrad.addColorStop(0.45, `hsla(${hue + 12}, 95%, 45%, ${0.15 * state.intensity})`);
+                    auraGrad.addColorStop(1, `hsla(${hue + 20}, 90%, 20%, 0)`);
+                    ctx.fillStyle = auraGrad;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, radius * 2.25, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // 2. Precision Holographic HUD Reticle & 64-Bar Harmonic Spectrum
+                    drawHudReticle(cx, cy, radius, hue);
+                    drawSpectrumRing(cx, cy, radius, hue);
+
+                    // 3. Rotating 3D Tilted Orbital Rings
+                    ctx.save();
+                    ctx.translate(cx, cy);
+                    const ringAlpha = (state.mode === 'thinking' ? 0.55 : 0.26) + state.chargeLevel * 0.3;
+                    for (let rIdx = 0; rIdx < 3; rIdx++) {
+                        ctx.save();
+                        ctx.rotate(state.time * (rIdx % 2 === 0 ? 0.42 : -0.62) + rIdx * 1.05);
+                        ctx.scale(1, 0.32 + rIdx * 0.15);
+                        ctx.beginPath();
+                        ctx.arc(0, 0, radius * (1.28 + rIdx * 0.14), 0, Math.PI * 2);
+                        ctx.strokeStyle = `hsla(${hue - 8}, 100%, 74%, ${ringAlpha * state.intensity})`;
+                        ctx.lineWidth = rIdx === 0 ? 1.6 : 1.1;
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                    ctx.restore();
+
+                    // 4. Expanding Energy Pulses
+                    for (let i = state.pulses.length - 1; i >= 0; i--) {
+                        const p = state.pulses[i];
+                        p.radius += 3.5;
+                        p.alpha *= 0.94;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, p.radius, 0, Math.PI * 2);
+                        ctx.strokeStyle = `hsla(${hue - 10}, 100%, 78%, ${p.alpha})`;
+                        ctx.lineWidth = p.lineWidth || 2.4;
+                        ctx.stroke();
+
+                        if (p.alpha < 0.02 || p.radius > p.maxRadius) {
+                            state.pulses.splice(i, 1);
+                        }
+                    }
+
+                    // 5. Layered Plasma Core, 3D Lattice & Electric Arcs (Additive Blending)
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'lighter';
+
+                    drawPlasmaLayer(cx, cy, radius * 1.03, 0.0, 0, hue + 10);
+                    drawPlasmaLayer(cx, cy, radius * 0.92, 2.1, 1, hue);
+                    drawPlasmaLayer(cx, cy, radius * 0.78, 4.2, 2, hue - 12);
+
+                    // Volumetric 3D Holographic Lattice inside the plasma sphere
+                    draw3DLattice(cx, cy, radius, hue);
+
+                    // Procedural Electric Plasma Filaments
+                    drawPlasmaArcs(cx, cy, radius, hue);
+
+                    // 6. Brilliant White-Blue Inner Singularity Core
+                    const coreGrad = ctx.createRadialGradient(
+                        cx - radius * 0.12,
+                        cy - radius * 0.15,
+                        radius * 0.03,
+                        cx,
+                        cy,
+                        radius * (0.72 + state.chargeLevel * 0.15)
+                    );
+                    coreGrad.addColorStop(0, `hsla(${hue - 16}, 100%, 97%, ${0.95 * state.intensity})`);
+                    coreGrad.addColorStop(0.32, `hsla(${hue - 5}, 100%, 68%, ${0.68 * state.intensity})`);
+                    coreGrad.addColorStop(1, `hsla(${hue + 10}, 100%, 40%, 0)`);
+
+                    ctx.fillStyle = coreGrad;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, radius * (0.72 + state.chargeLevel * 0.15), 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // 7. Fresnel Containment Shell & Dual Specular Highlights
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, radius * 0.98, 0, Math.PI * 2);
+                    ctx.strokeStyle = `hsla(${hue - 14}, 100%, 82%, ${0.26 * state.intensity})`;
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, radius * 0.94, Math.PI * 1.08, Math.PI * 1.62);
+                    ctx.strokeStyle = `hsla(${hue - 20}, 100%, 92%, ${0.42 * state.intensity})`;
+                    ctx.lineWidth = 2.2;
+                    ctx.lineCap = 'round';
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, radius * 0.94, Math.PI * 0.18, Math.PI * 0.42);
+                    ctx.strokeStyle = `hsla(${hue}, 100%, 76%, ${0.22 * state.intensity})`;
+                    ctx.lineWidth = 1.5;
+                    ctx.lineCap = 'round';
+                    ctx.stroke();
+
+                    // 8. Orbiting Micro-Particles
+                    state.particles.forEach(pt => {
+                        pt.angle += pt.speed * state.currentSpeed * state.speedMultiplier;
+                        const wobble = Math.sin(state.time * 2 + pt.wobblePhase) * 8;
+                        const dist = radius * pt.orbitFactor + wobble;
+                        const px = cx + Math.cos(pt.angle) * dist;
+                        const py = cy + Math.sin(pt.angle) * dist;
+
+                        ctx.fillStyle = `hsla(${pt.isBright ? hue - 18 : hue - 6}, 100%, ${pt.isBright ? 92 : 78}%, ${pt.alpha * state.intensity})`;
+                        ctx.beginPath();
+                        ctx.arc(px, py, pt.size, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+
+                    ctx.restore();
+
+                    // Update numeric HUD readouts
+                    updateTelemetry();
+                } catch (err) {
+                    console.error('Render loop error:', err);
+                }
+
+                requestAnimationFrame(render);
+            }
+
+            /**
+             * Event Listeners Setup
+             */
+            function bindEvents() {
+                window.addEventListener('resize', resizeCanvas);
+
+                // Pointer / Touch interaction + Hold-to-Charge on the Orb Stage
+                stage.addEventListener('pointermove', (e) => {
+                    const rect = stage.getBoundingClientRect();
+                    state.pointerX = e.clientX - rect.left;
+                    state.pointerY = e.clientY - rect.top;
+                    state.pointerActive = true;
+                });
+
+                stage.addEventListener('pointerdown', () => {
+                    state.isCharging = true;
+                    if (orbHint) orbHint.classList.add('opacity-0');
+                });
+
+                const releaseCharge = () => {
+                    if (!state.isCharging) return;
+                    state.isCharging = false;
+                    if (state.chargeLevel > 0.35) {
+                        triggerPulse(1.65);
+                        setTimeout(() => triggerPulse(1.15), 140);
+                        showToast(`Overcharge Pulse Released (${Math.round(state.chargeLevel * 100)}%)`);
+                    } else {
+                        triggerPulse(1.0);
+                    }
+                };
+
+                stage.addEventListener('pointerup', releaseCharge);
+                stage.addEventListener('pointercancel', releaseCharge);
+
+                stage.addEventListener('pointerleave', () => {
+                    state.pointerActive = false;
+                    if (state.isCharging) releaseCharge();
+                });
+
+                // Mode Buttons
+                modeButtons.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        setMode(btn.dataset.mode);
+                        triggerPulse();
+                    });
+                });
+
+                // Pulse Button
+                pulseButton.addEventListener('click', () => {
+                    triggerPulse();
+                    showToast('Energy Pulse Emitted');
+                });
+
+                // Settings Drawer Toggle
+                settingsButton.addEventListener('click', () => {
+                    settingsPanel.classList.toggle('hidden');
+                });
+
+                // Sound Toggle
+                soundButton.addEventListener('click', () => {
+                    state.soundEnabled = !state.soundEnabled;
+                    iconSoundOff.classList.toggle('hidden', state.soundEnabled);
+                    iconSoundOn.classList.toggle('hidden', !state.soundEnabled);
+                    soundLabel.textContent = state.soundEnabled ? 'Audio On' : 'Audio Off';
+                    if (state.soundEnabled) {
+                        playTone(520, 0.2);
+                        showToast('Synthesized UI Audio Enabled');
+                    } else {
+                        showToast('UI Audio Muted');
+                    }
+                });
+
+                // Parameter Sliders
+                sliderIntensity.addEventListener('input', (e) => {
+                    const val = Number(e.target.value);
+                    state.intensity = val / 100;
+                    valIntensity.textContent = `${val}%`;
+                });
+
+                sliderSpeed.addEventListener('input', (e) => {
+                    const val = Number(e.target.value);
+                    state.speedMultiplier = val / 100;
+                    valSpeed.textContent = `${(val / 100).toFixed(1)}x`;
+                });
+
+                sliderHue.addEventListener('input', (e) => {
+                    const val = Number(e.target.value);
+                    state.hue = val;
+                    valHue.textContent = `${val}°`;
+                });
+
+                sliderDetail.addEventListener('input', (e) => {
+                    const val = Number(e.target.value);
+                    state.detailLevel = val / 100;
+                    valDetail.textContent = `${val}%`;
+                });
+
+                toggleHud.addEventListener('change', (e) => {
+                    state.showHud = e.target.checked;
+                    hudOverlays.forEach(el => el.classList.toggle('hidden', !state.showHud));
+                });
+
+                resetParamsButton.addEventListener('click', () => {
+                    sliderIntensity.value = 100;
+                    sliderSpeed.value = 100;
+                    sliderHue.value = 205;
+                    sliderDetail.value = 100;
+                    toggleHud.checked = true;
+                    state.intensity = 1.0;
+                    state.speedMultiplier = 1.0;
+                    state.hue = 205;
+                    state.detailLevel = 1.0;
+                    state.showHud = true;
+                    hudOverlays.forEach(el => el.classList.remove('hidden'));
+                    valIntensity.textContent = '100%';
+                    valSpeed.textContent = '1.0x';
+                    valHue.textContent = '205°';
+                    valDetail.textContent = '100%';
+                    showToast('Core Parameters Reset');
+                });
+
+                // Simulated Command Transmission
+                commandForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const text = commandInput.value.trim();
+                    if (!text) return;
+
+                    commandInput.value = '';
+                    clearTimeout(state.commandTimer);
+
+                    // Transition: Thinking -> Speaking -> Idle
+                    setMode('thinking', `"Processing transmission: '${text}'..."`);
+                    triggerPulse();
+
+                    state.commandTimer = setTimeout(() => {
+                        setMode('speaking', `"Signal received: '${text}'. Core harmonics adjusted and ready."`);
+                        triggerPulse();
+
+                        state.commandTimer = setTimeout(() => {
+                            setMode('idle');
+                        }, 4200);
+                    }, 1600);
+                });
+            }
+
+            // Initialize cleanly after window load
+            window.onload = function () {
+                resizeCanvas();
+                initParticles();
+                bindEvents();
+                render();
+            };
+        })();
+    </script>
+</body>
+</html>
