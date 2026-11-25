@@ -103,6 +103,21 @@
             </p>
         </div>
 
+        <!-- Autonomous AI Agent: what it is doing right now, its verdict per site, and its reasoning -->
+        <section id="agent-panel" class="hidden w-full max-w-xl mb-4 p-3 rounded-2xl bg-zinc-950/90 border border-violet-500/25 shadow-[0_0_30px_rgba(139,92,246,0.08)] backdrop-blur-xl">
+            <div class="flex items-center justify-between gap-2 px-1 mb-2.5">
+                <div class="flex items-center gap-2 min-w-0">
+                    <span id="agent-dot" class="w-2 h-2 rounded-full bg-violet-400 shadow-[0_0_10px_rgba(167,139,250,0.9)] animate-pulse"></span>
+                    <span class="text-[11px] uppercase tracking-wider font-medium text-violet-200">AI Agent</span>
+                    <span id="agent-status" class="text-[11px] text-slate-400 truncate">Starting…</span>
+                </div>
+                <button id="agent-toggle" type="button" class="shrink-0 px-2.5 py-1 rounded-lg border border-zinc-700 hover:border-violet-400/50 text-[11px] text-slate-300 transition-all active:scale-95">Pause</button>
+            </div>
+            <div id="agent-sites" class="grid grid-cols-3 sm:grid-cols-6 gap-1.5 mb-2.5"></div>
+            <div id="agent-log" class="max-h-40 overflow-y-auto space-y-1 font-mono text-[11px] px-1"></div>
+            <p class="mt-2 px-1 text-[10px] text-slate-500">Reviews the real request logs, uploads and email sends of each site in turn, using built-in rules that run in this browser. It flags and explains; it never shuts a site down on its own. Tap a site to send the agent there next.</p>
+        </section>
+
         <!-- 4 Clean Focus Pills (Overview, Traffic, Brevo, Supabase) -->
         <nav aria-label="System Focus" class="w-full max-w-xl grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
             <button type="button" data-focus="overview"
@@ -801,6 +816,7 @@
                 try {
                     const r = await api('summary');
                     applyData(r.body);
+                    if (hub.loaded) startAgent();
                 } catch (e) {
                     return;
                 }
@@ -2008,6 +2024,550 @@
             }
 
             /**
+             * Autonomous Review Agent
+             * Runs continuously after sign-in: picks a site, opens its live activity log and
+             * file traffic, streams every request/file/email through the orb as labelled packets,
+             * then reviews what it saw and posts a verdict. It only flags and explains — it never
+             * shuts anything down on its own (the kill switch always needs a human tap).
+             */
+            const AGENT_SITES = ['marketing', 'commuter', 'vip', 'receipts', 'portal', 'timesheet'];
+            const BUCKET_APP = { 'receipts-photos': 'receipts', 'timesheet-camera': 'timesheet', 'vip-banners': 'vip', 'portal-backgrounds': 'portal' };
+            const VERDICT_STYLE = {
+                clear: { hue: 150, label: 'Clear', cls: 'border-emerald-500/40 text-emerald-300 bg-emerald-500/10' },
+                watch: { hue: 38, label: 'Watch', cls: 'border-amber-400/50 text-amber-300 bg-amber-500/10' },
+                concern: { hue: 358, label: 'Concern', cls: 'border-red-500/50 text-red-300 bg-red-500/10' },
+                pending: { hue: 205, label: '…', cls: 'border-zinc-700 text-slate-400 bg-zinc-900/60' }
+            };
+
+            const agent = {
+                on: sessionStorage.getItem('agent_paused') !== '1',
+                running: false,
+                site: null,          // key of the site being reviewed right now
+                phase: 'idle',       // idle | opening | reading | analyzing | verdict
+                phaseText: '',
+                step: 0,
+                expand: 0,           // 0..1 orb expansion while "inside" a site
+                lensAlpha: 0,
+                ticker: [],          // last plain-English lines seen inside the current site
+                chips: [],           // labelled packets flying between orb and site
+                verdicts: {},        // key -> { level, summary, at }
+                queue: [],           // sites a human asked to look at next
+                idx: 0,
+                filesCache: null,
+                filesAt: 0,
+                lines: 0,
+                wake: null
+            };
+
+            const agentPanel = document.getElementById('agent-panel');
+            const agentStatus = document.getElementById('agent-status');
+            const agentDot = document.getElementById('agent-dot');
+            const agentToggle = document.getElementById('agent-toggle');
+            const agentSitesEl = document.getElementById('agent-sites');
+            const agentLog = document.getElementById('agent-log');
+
+            const sleep = (ms) => new Promise(res => {
+                const t = setTimeout(res, ms);
+                agent.wake = () => { clearTimeout(t); res(); };
+            });
+            const normApp = (a) => (a === 'commuter-auth' || a === 'commuter-state') ? 'commuter' : String(a || '');
+            const sayRow = (r) => (window.cabSay ? window.cabSay(r) : (formatSiteLabel(r.app) + ': ' + (r.action || 'request')));
+            const fmtKB = (n) => { n = +n || 0; return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; };
+            const clock = () => new Date().toLocaleTimeString([], { hour12: false });
+
+            function think(text, tone = 'info') {
+                if (!agentLog) return;
+                const colors = { info: 'text-slate-300', step: 'text-sky-200', ok: 'text-emerald-300', warn: 'text-amber-300', bad: 'text-red-300', dim: 'text-slate-500' };
+                const row = document.createElement('div');
+                row.className = 'flex gap-2 leading-snug';
+                const t = document.createElement('span');
+                t.className = 'text-slate-600 shrink-0';
+                t.textContent = clock();
+                const m = document.createElement('span');
+                m.className = colors[tone] || colors.info;
+                m.textContent = text;
+                row.appendChild(t);
+                row.appendChild(m);
+                agentLog.appendChild(row);
+                while (agentLog.childElementCount > 80) agentLog.removeChild(agentLog.firstChild);
+                agentLog.scrollTop = agentLog.scrollHeight;
+            }
+
+            function setPhase(phase, text) {
+                agent.phase = phase;
+                agent.phaseText = text;
+                if (agentStatus) agentStatus.textContent = text;
+            }
+
+            function renderAgentSites() {
+                if (!agentSitesEl) return;
+                agentSitesEl.textContent = '';
+                agentSiteList().forEach(key => {
+                    const v = agent.verdicts[key];
+                    const st = VERDICT_STYLE[v ? v.level : 'pending'];
+                    const active = agent.site === key;
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'px-2.5 py-1.5 rounded-xl border text-left transition-all active:scale-95 ' + st.cls + (active ? ' ring-1 ring-sky-300/70' : '');
+                    b.title = v ? v.summary : 'Not reviewed yet — tap to review next';
+                    const name = document.createElement('div');
+                    name.className = 'text-[11px] font-medium flex items-center gap-1.5';
+                    if (active) {
+                        const d = document.createElement('span');
+                        d.className = 'w-1.5 h-1.5 rounded-full bg-sky-300 animate-pulse';
+                        name.appendChild(d);
+                    }
+                    name.appendChild(document.createTextNode(formatSiteLabel(key)));
+                    const sub = document.createElement('div');
+                    sub.className = 'text-[10px] font-mono opacity-80';
+                    sub.textContent = active ? 'reviewing…' : (v ? st.label + ' · ' + agoShort(v.at) : 'queued');
+                    b.appendChild(name);
+                    b.appendChild(sub);
+                    b.addEventListener('click', () => {
+                        agent.queue = agent.queue.filter(k => k !== key);
+                        agent.queue.unshift(key);
+                        think('You asked me to look at ' + formatSiteLabel(key) + ' next.', 'dim');
+                        if (!agent.on) setAgentOn(true);
+                        if (agent.wake) agent.wake();
+                    });
+                    agentSitesEl.appendChild(b);
+                });
+            }
+
+            function agoShort(ts) {
+                const s = Math.max(0, (Date.now() - ts) / 1000);
+                if (s < 60) return Math.floor(s) + 's ago';
+                if (s < 3600) return Math.floor(s / 60) + 'm ago';
+                return Math.floor(s / 3600) + 'h ago';
+            }
+
+            function agentSiteList() {
+                const keys = new Set(AGENT_SITES);
+                Object.keys(hub.by_app || {}).forEach(k => { if (k) keys.add(normApp(k)); });
+                return Array.from(keys);
+            }
+
+            /** Live sites first, then sites with open alerts, then everything else in rotation. */
+            function nextSite() {
+                if (agent.queue.length) return agent.queue.shift();
+                const all = agentSiteList();
+                const live = orb.siteNodes.map(s => normApp(s.key)).filter(k => all.includes(k));
+                const alerted = (hub.alerts || []).map(a => normApp(a.app)).filter(k => all.includes(k));
+                const priority = Array.from(new Set([...live, ...alerted]));
+                const rest = all.filter(k => !priority.includes(k));
+                const order = [...priority, ...rest];
+                const key = order[agent.idx % order.length];
+                agent.idx++;
+                return key;
+            }
+
+            /** Where on screen a site lives: its live node if it has one, otherwise a ghost slot. */
+            function agentTarget(key) {
+                const live = orb.siteNodes.find(s => normApp(s.key) === key);
+                if (live) return { x: live.x, y: live.y, r: live.radius, ghost: false };
+                const list = agentSiteList();
+                const i = Math.max(0, list.indexOf(key));
+                const a = -Math.PI / 2 + (i / list.length) * Math.PI * 2 + Math.PI / list.length;
+                const rx = Math.max(orb.baseRadius + 60, orb.width / 2 - Math.min(80, orb.width * 0.14));
+                const ry = Math.max(orb.baseRadius + 46, orb.height / 2 - Math.min(52, orb.height * 0.12));
+                return { x: orb.cx + Math.cos(a) * rx, y: orb.cy + Math.sin(a) * ry, r: 13, ghost: true };
+            }
+
+            function spawnChip(text, dir, tone) {
+                if (agent.chips.length >= 9) agent.chips.shift();
+                agent.chips.push({ text, dir, tone, t: 0, speed: 0.011 + Math.random() * 0.005, lane: 6 + Math.random() * 16 });
+            }
+
+            /** Reviews one site end to end. */
+            async function reviewSite(key) {
+                const label = formatSiteLabel(key);
+                agent.site = key;
+                agent.ticker = [];
+                agent.step = 1;
+                renderAgentSites();
+                setPhase('opening', 'Opening ' + label + '…');
+                think('Opening ' + label + ' — pulling its live request log and file traffic.', 'step');
+                triggerPulse(0.55, 205);
+
+                // 1. Read the real logs for this site
+                let activity = [];
+                try {
+                    const r = await api('activity', { app: key, limit: 80 });
+                    activity = (r.body && r.body.activity) || [];
+                } catch (e) {
+                    if (e.message === 'auth') return false;
+                }
+                if (Date.now() - agent.filesAt > 30000) {
+                    try {
+                        const f = await api('files');
+                        if (f.body && !f.body.error) { agent.filesCache = f.body; agent.filesAt = Date.now(); }
+                    } catch (e) { /* files are optional */ }
+                }
+                if (!agent.on) return true;
+
+                activity.forEach(r => { r.app = normApp(r.app); });
+                if (hub.clearedAt) activity = activity.filter(r => new Date(r.ts).getTime() > hub.clearedAt);
+                const files = agent.filesCache || { objects: [], sends: [], file_events: [] };
+                const uploads = (files.objects || []).filter(o => BUCKET_APP[o.bucket] === key);
+                const sends = (files.sends || []).filter(s => normApp(s.app) === key);
+
+                // 2. Walk through what is moving in and out, packet by packet
+                agent.step = 2;
+                setPhase('reading', 'Reading ' + activity.length + ' events in ' + label);
+                think('Found ' + activity.length + ' recent events, ' + uploads.length + ' stored uploads, ' + sends.length + ' emails sent.', 'info');
+
+                const stream = activity.slice(0, 14).reverse();
+                for (const r of stream) {
+                    if (!agent.on) return true;
+                    const bad = r.src !== 'app log' && r.status >= 400;
+                    const act = String(r.action || 'request').toLowerCase();
+                    spawnChip(act.slice(0, 16), 'in', bad ? 'bad' : 'in');
+                    agent.ticker.unshift({ text: sayRow(r), bad });
+                    agent.ticker = agent.ticker.slice(0, 4);
+                    await sleep(260);
+                    if (r.src !== 'app log' && r.status) spawnChip(bad ? 'refused ' + r.status : String(r.status), 'out', bad ? 'bad' : 'out');
+                    await sleep(160);
+                }
+                for (const o of uploads.slice(0, 4)) {
+                    if (!agent.on) return true;
+                    const ext = String(o.name || '').split('.').pop().slice(0, 5) || 'file';
+                    spawnChip('file · ' + ext + ' ' + fmtKB(o.size), 'in', 'file');
+                    agent.ticker.unshift({ text: label + ': file in — ' + (o.mime || ext) + ', ' + fmtKB(o.size), bad: false });
+                    agent.ticker = agent.ticker.slice(0, 4);
+                    await sleep(320);
+                }
+                for (const s of sends.slice(0, 3)) {
+                    if (!agent.on) return true;
+                    spawnChip('email → ' + (s.recipients || 1), 'out', 'mail');
+                    agent.ticker.unshift({ text: label + ': email out' + (s.subject ? ' — "' + s.subject + '"' : ''), bad: false });
+                    agent.ticker = agent.ticker.slice(0, 4);
+                    await sleep(320);
+                }
+
+                // 3. Review what was seen
+                agent.step = 3;
+                setPhase('analyzing', 'Reviewing ' + label + '…');
+                const findings = analyzeSite(key, activity, uploads, sends);
+                for (const f of findings) {
+                    if (!agent.on) return true;
+                    await sleep(420);
+                    think(f.text, f.level === 'concern' ? 'bad' : f.level === 'watch' ? 'warn' : 'info');
+                }
+
+                const level = findings.some(f => f.level === 'concern') ? 'concern'
+                    : findings.some(f => f.level === 'watch') ? 'watch' : 'clear';
+                const headline = (findings.find(f => f.level === level) || findings[0] || { text: 'Nothing unusual.' }).text;
+                agent.verdicts[key] = { level, summary: headline, at: Date.now() };
+                agent.step = 4;
+                setPhase('verdict', label + ': ' + VERDICT_STYLE[level].label);
+                think('Verdict for ' + label + ': ' + VERDICT_STYLE[level].label.toUpperCase() +
+                    (level === 'concern' ? ' — tap the kill switch below if this was not you.' : ''), level === 'clear' ? 'ok' : level === 'watch' ? 'warn' : 'bad');
+                triggerPulse(level === 'clear' ? 0.6 : 1.0, VERDICT_STYLE[level].hue);
+                if (level !== 'clear') playTone(level === 'concern' ? 220 : 330, 0.3, 'sawtooth');
+                renderAgentSites();
+                await sleep(1800);
+                return true;
+            }
+
+            /**
+             * Rule-based review of one site's real activity. Each finding is plain English
+             * and carries a level: info | watch | concern.
+             */
+            function analyzeSite(key, activity, uploads, sends) {
+                const out = [];
+                const label = formatSiteLabel(key);
+                const now = Date.now();
+                const reqs = activity.filter(r => r.src !== 'app log');
+                const recent = activity.filter(r => now - new Date(r.ts).getTime() < 24 * 3600 * 1000);
+
+                if (!activity.length) {
+                    out.push({ level: 'info', text: 'No requests recorded for ' + label + ' yet — nothing to review.' });
+                    return out;
+                }
+
+                const ips = new Set(reqs.map(r => r.ip).filter(Boolean));
+                out.push({ level: 'info', text: recent.length + ' events in the last 24h from ' + ips.size + ' IP address' + (ips.size === 1 ? '' : 'es') + '.' });
+
+                // Failed sign-ins, grouped by IP
+                const failedLogins = reqs.filter(r => String(r.action).toLowerCase() === 'login' && r.status >= 400);
+                if (failedLogins.length) {
+                    const byIp = {};
+                    failedLogins.forEach(r => { byIp[r.ip || 'unknown'] = (byIp[r.ip || 'unknown'] || 0) + 1; });
+                    const [topIp, topN] = Object.entries(byIp).sort((a, b) => b[1] - a[1])[0];
+                    out.push({
+                        level: failedLogins.length >= 3 ? 'concern' : 'watch',
+                        text: failedLogins.length + ' failed sign-in' + (failedLogins.length === 1 ? '' : 's') + (topN > 1 ? ', ' + topN + ' from ' + topIp : '') + '.'
+                    });
+                }
+
+                // Other refused requests
+                const refused = reqs.filter(r => r.status >= 400 && String(r.action).toLowerCase() !== 'login');
+                if (refused.length >= 5) out.push({ level: 'watch', text: refused.length + ' requests were refused by the server — someone may be probing.' });
+                else if (refused.length) out.push({ level: 'info', text: refused.length + ' refused request' + (refused.length === 1 ? '' : 's') + ' (normal at low volume).' });
+
+                // Password / access changes
+                const access = activity.filter(r => /changetoken|setadminpassword/i.test(r.action || ''));
+                if (access.length) out.push({ level: 'watch', text: 'A password or access setting was changed ' + agoShort(new Date(access[0].ts).getTime()) + ' — confirm that was you.' });
+
+                // Deletions
+                const deletes = activity.filter(r => /remove|delete/i.test((r.action || '') + ' ' + (r.op || '')));
+                if (deletes.length >= 5) out.push({ level: 'watch', text: deletes.length + ' deletions in this window — more than usual.' });
+                else if (deletes.length) out.push({ level: 'info', text: deletes.length + ' deletion' + (deletes.length === 1 ? '' : 's') + ' recorded.' });
+
+                // Requests the dashboard can't explain
+                const unknown = activity.filter(r => /Unrecognized request/.test(sayRow(r)));
+                if (unknown.length) out.push({ level: 'watch', text: unknown.length + ' request' + (unknown.length === 1 ? '' : 's') + ' I don\'t recognise (e.g. "' + String(unknown[0].action || '').slice(0, 24) + '").' });
+
+                // Late-night activity
+                const night = recent.filter(r => { const h = new Date(r.ts).getHours(); return h >= 0 && h < 5; });
+                if (night.length >= 3) out.push({ level: 'watch', text: night.length + ' events between midnight and 5am.' });
+
+                // Bursts: many requests inside one minute
+                const times = reqs.map(r => new Date(r.ts).getTime()).sort((a, b) => a - b);
+                let burst = 0;
+                for (let i = 0, j = 0; i < times.length; i++) {
+                    while (times[i] - times[j] > 60000) j++;
+                    burst = Math.max(burst, i - j + 1);
+                }
+                if (burst >= 30) out.push({ level: 'watch', text: 'Burst of ' + burst + ' requests inside one minute.' });
+
+                // Files and email moving out
+                const upl24 = uploads.filter(o => now - new Date(o.created_at).getTime() < 24 * 3600 * 1000);
+                if (upl24.length) out.push({ level: 'info', text: upl24.length + ' file' + (upl24.length === 1 ? '' : 's') + ' came in today (' + fmtKB(upl24.reduce((s, o) => s + (+o.size || 0), 0)) + ').' });
+                if (sends.length) {
+                    const rcpt = sends.reduce((s, e) => s + (+e.recipients || 0), 0);
+                    out.push({ level: 'info', text: sends.length + ' email send' + (sends.length === 1 ? '' : 's') + ' going out' + (rcpt ? ' to ' + rcpt + ' recipients' : '') + '.' });
+                }
+                if (hub.brevo.flagged > 0 && sends.length) out.push({ level: 'concern', text: 'The email service has ' + hub.brevo.flagged + ' flagged send(s) — check what went out.' });
+
+                // Open alerts already raised by the server
+                const alerts = (hub.alerts || []).filter(a => normApp(a.app) === key);
+                if (alerts.length) {
+                    const sev = alerts.some(a => a.severity === 'high' || a.severity === 'critical');
+                    out.push({ level: sev ? 'concern' : 'watch', text: alerts.length + ' open server alert' + (alerts.length === 1 ? '' : 's') + ': ' + alerts.map(a => String(a.rule || 'alert').replace(/_/g, ' ')).slice(0, 3).join(', ') + '.' });
+                }
+
+                if (!out.some(f => f.level !== 'info')) out.push({ level: 'info', text: 'Nothing unusual in ' + label + '.' });
+                return out;
+            }
+
+            async function agentLoop() {
+                if (agent.running) return;
+                agent.running = true;
+                think('Agent online. I\'ll keep rotating through every site, reading real traffic and flagging anything odd.', 'step');
+                while (agent.on && token) {
+                    if (document.hidden || !hub.loaded) { await sleep(1500); continue; }
+                    const key = nextSite();
+                    if (!key) { await sleep(3000); continue; }
+                    const ok = await reviewSite(key);
+                    if (ok === false) break;
+                    agent.site = null;
+                    agent.ticker = [];
+                    renderAgentSites();
+                    if (!agent.on) break;
+                    setPhase('idle', 'Watching live traffic…');
+                    await sleep(2200);
+                }
+                agent.site = null;
+                agent.running = false;
+                setPhase('idle', agent.on ? 'Waiting for data…' : 'Paused');
+                renderAgentSites();
+            }
+
+            function setAgentOn(on) {
+                agent.on = on;
+                try { sessionStorage.setItem('agent_paused', on ? '0' : '1'); } catch (e) { /* ignore */ }
+                if (agentToggle) agentToggle.textContent = on ? 'Pause' : 'Resume';
+                if (agentDot) agentDot.className = 'w-2 h-2 rounded-full ' + (on ? 'bg-violet-400 shadow-[0_0_10px_rgba(167,139,250,0.9)] animate-pulse' : 'bg-slate-600');
+                if (on) {
+                    agentLoop();
+                } else {
+                    think('Paused by you.', 'dim');
+                    if (agent.wake) agent.wake();
+                }
+            }
+
+            function startAgent() {
+                if (agentPanel) agentPanel.classList.remove('hidden');
+                renderAgentSites();
+                if (agent.on && !agent.running) setAgentOn(true);
+                else if (!agent.on) setAgentOn(false);
+            }
+
+            /** Beam, ghost node and labelled packets between the orb and the site under review. */
+            function drawAgentTraffic(cx, cy, radius) {
+                const active = agent.on && agent.site;
+                agent.expand += ((active ? 1 : 0) - agent.expand) * 0.05;
+                agent.lensAlpha += ((active ? 1 : 0) - agent.lensAlpha) * 0.07;
+                if (!agent.site && !agent.chips.length) return;
+
+                const tgt = agent.site ? agentTarget(agent.site) : null;
+                const v = agent.site && agent.verdicts[agent.site];
+                const hue = agent.phase === 'verdict' && v ? VERDICT_STYLE[v.level].hue : 265;
+
+                if (tgt && agent.lensAlpha > 0.02) {
+                    const ang = Math.atan2(tgt.y - cy, tgt.x - cx);
+                    const ex = cx + Math.cos(ang) * radius * 0.95;
+                    const ey = cy + Math.sin(ang) * radius * 0.95;
+
+                    // Scan beam
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'lighter';
+                    const g = ctx.createLinearGradient(ex, ey, tgt.x, tgt.y);
+                    g.addColorStop(0, `hsla(${hue}, 100%, 75%, ${0.55 * agent.lensAlpha})`);
+                    g.addColorStop(1, `hsla(${hue}, 100%, 70%, ${0.15 * agent.lensAlpha})`);
+                    ctx.strokeStyle = g;
+                    ctx.lineWidth = 10;
+                    ctx.globalAlpha = 0.25;
+                    ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(tgt.x, tgt.y); ctx.stroke();
+                    ctx.globalAlpha = 1;
+                    ctx.lineWidth = 1.2;
+                    ctx.setLineDash([4, 7]);
+                    ctx.lineDashOffset = -orb.frame * 0.8;
+                    ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(tgt.x, tgt.y); ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Focus ring around the site being inspected
+                    const pr = tgt.r + 8 + Math.sin(orb.frame * 0.08) * 2;
+                    ctx.strokeStyle = `hsla(${hue}, 100%, 75%, ${0.8 * agent.lensAlpha})`;
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath(); ctx.arc(tgt.x, tgt.y, pr, orb.frame * 0.03, orb.frame * 0.03 + Math.PI * 1.4); ctx.stroke();
+                    ctx.restore();
+
+                    // Ghost node for sites with no live connection right now
+                    if (tgt.ghost) {
+                        ctx.save();
+                        ctx.globalAlpha = agent.lensAlpha;
+                        ctx.fillStyle = 'rgba(9, 9, 11, 0.9)';
+                        ctx.strokeStyle = `hsla(${hue}, 80%, 70%, 0.8)`;
+                        ctx.setLineDash([3, 3]);
+                        ctx.lineWidth = 1.2;
+                        ctx.beginPath(); ctx.arc(tgt.x, tgt.y, tgt.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                        ctx.setLineDash([]);
+                        ctx.font = '600 10px Inter, sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.fillStyle = 'rgba(226, 232, 240, 0.9)';
+                        ctx.fillText(formatSiteLabel(agent.site).toUpperCase(), tgt.x, tgt.y + tgt.r + 14);
+                        ctx.restore();
+                    }
+                }
+
+                // Labelled packets: requests/files flow in, responses/emails flow out
+                ctx.save();
+                ctx.font = '600 9.5px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                for (let i = agent.chips.length - 1; i >= 0; i--) {
+                    const c = agent.chips[i];
+                    c.t += c.speed;
+                    if (!tgt || c.t >= 1) {
+                        if (tgt && c.t >= 1) {
+                            if (c.dir === 'in') {
+                                const a = Math.atan2(tgt.y - cy, tgt.x - cx);
+                                spawnSpark(cx + Math.cos(a) * radius * 0.9, cy + Math.sin(a) * radius * 0.9, c.tone === 'bad' ? 358 : 200, c.tone === 'bad');
+                                orb3d.surge = Math.max(orb3d.surge, 0.18);
+                            } else {
+                                spawnSpark(tgt.x, tgt.y, c.tone === 'bad' ? 358 : 150, c.tone === 'bad');
+                            }
+                        }
+                        agent.chips.splice(i, 1);
+                        continue;
+                    }
+                    const ang = Math.atan2(tgt.y - cy, tgt.x - cx);
+                    const ox = cx + Math.cos(ang) * radius * 0.95;
+                    const oy = cy + Math.sin(ang) * radius * 0.95;
+                    const lane = (c.dir === 'in' ? -1 : 1) * c.lane;
+                    const nx = -Math.sin(ang) * lane;
+                    const ny = Math.cos(ang) * lane;
+                    const e = c.t < 0.5 ? 2 * c.t * c.t : 1 - Math.pow(-2 * c.t + 2, 2) / 2;
+                    const from = c.dir === 'in' ? { x: tgt.x, y: tgt.y } : { x: ox, y: oy };
+                    const to = c.dir === 'in' ? { x: ox, y: oy } : { x: tgt.x, y: tgt.y };
+                    const x = from.x + (to.x - from.x) * e + nx;
+                    const y = from.y + (to.y - from.y) * e + ny;
+                    const alpha = Math.min(1, c.t * 6, (1 - c.t) * 6);
+                    const palette = {
+                        in: [200, 'IN'], out: [150, 'OUT'], bad: [358, '!'], file: [282, 'FILE'], mail: [38, 'MAIL']
+                    }[c.tone] || [200, ''];
+                    const label = (c.dir === 'in' ? '↓ ' : '↑ ') + c.text;
+                    const w = ctx.measureText(label).width + 12;
+                    ctx.globalAlpha = alpha;
+                    ctx.fillStyle = 'rgba(5, 8, 16, 0.88)';
+                    ctx.strokeStyle = `hsla(${palette[0]}, 95%, 65%, 0.85)`;
+                    ctx.lineWidth = 1;
+                    roundRect(x - w / 2, y - 8, w, 16, 8);
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.fillStyle = `hsla(${palette[0]}, 100%, 85%, 1)`;
+                    ctx.fillText(label, x, y + 0.5);
+                }
+                ctx.restore();
+            }
+
+            function roundRect(x, y, w, h, r) {
+                ctx.beginPath();
+                ctx.moveTo(x + r, y);
+                ctx.arcTo(x + w, y, x + w, y + h, r);
+                ctx.arcTo(x + w, y + h, x, y + h, r);
+                ctx.arcTo(x, y + h, x, y, r);
+                ctx.arcTo(x, y, x + w, y, r);
+                ctx.closePath();
+            }
+
+            /** The "window" into the site: drawn over the orb core while the agent is inside a site. */
+            function drawAgentLens(cx, cy, radius) {
+                if (agent.lensAlpha < 0.03 || !agent.site) return;
+                const a = agent.lensAlpha;
+                const lr = radius * 0.62;
+                ctx.save();
+                const g = ctx.createRadialGradient(cx, cy, lr * 0.2, cx, cy, lr);
+                g.addColorStop(0, `rgba(2, 4, 12, ${0.88 * a})`);
+                g.addColorStop(0.8, `rgba(2, 4, 12, ${0.7 * a})`);
+                g.addColorStop(1, 'rgba(2, 4, 12, 0)');
+                ctx.fillStyle = g;
+                ctx.beginPath(); ctx.arc(cx, cy, lr, 0, Math.PI * 2); ctx.fill();
+
+                // Progress ring: opening → reading → reviewing → verdict
+                const v = agent.verdicts[agent.site];
+                const hue = agent.phase === 'verdict' && v ? VERDICT_STYLE[v.level].hue : 265;
+                ctx.strokeStyle = `hsla(${hue}, 100%, 72%, ${0.25 * a})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(cx, cy, lr * 0.9, 0, Math.PI * 2); ctx.stroke();
+                ctx.strokeStyle = `hsla(${hue}, 100%, 78%, ${0.9 * a})`;
+                ctx.lineCap = 'round';
+                ctx.beginPath(); ctx.arc(cx, cy, lr * 0.9, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, agent.step / 4)); ctx.stroke();
+
+                ctx.globalAlpha = a;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = `hsla(${hue}, 100%, 82%, 1)`;
+                ctx.font = '600 9px Inter, sans-serif';
+                ctx.fillText(('AGENT · STEP ' + Math.min(agent.step, 4) + '/4').split('').join(String.fromCharCode(8202)), cx, cy - lr * 0.56);
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = `600 ${Math.max(13, Math.round(lr * 0.16))}px Inter, sans-serif`;
+                ctx.fillText(formatSiteLabel(agent.site), cx, cy - lr * 0.36);
+                ctx.fillStyle = 'rgba(203, 213, 225, 0.9)';
+                ctx.font = '400 10.5px Inter, sans-serif';
+                ctx.fillText(clip(agent.phaseText, lr * 1.6), cx, cy - lr * 0.16);
+
+                // Live ticker of what the agent is looking at inside this site
+                ctx.font = '400 9.5px Inter, sans-serif';
+                agent.ticker.forEach((t, i) => {
+                    ctx.fillStyle = t.bad ? `rgba(252, 165, 165, ${1 - i * 0.2})` : `rgba(186, 230, 253, ${1 - i * 0.22})`;
+                    const y = cy + lr * 0.08 + i * 14;
+                    const halfW = Math.sqrt(Math.max(0, lr * lr - (y - cy) * (y - cy))) * 0.88;
+                    ctx.fillText(clip(t.text, halfW * 2), cx, y);
+                });
+                ctx.restore();
+            }
+
+            function clip(text, maxW) {
+                text = String(text || '');
+                if (ctx.measureText(text).width <= maxW) return text;
+                while (text.length > 3 && ctx.measureText(text + '…').width > maxW) text = text.slice(0, -1);
+                return text + '…';
+            }
+
+            /**
              * Main animation loop.
              */
             function render() {
@@ -2023,9 +2583,9 @@
                 if (hueDiff < -180) hueDiff += 360;
                 orb.hue = (orb.hue + hueDiff * 0.05 + 360) % 360;
 
-                orb.speed += (orb.targetSpeed + orb.holdLevel * 1.6 - orb.speed) * 0.06;
+                orb.speed += (orb.targetSpeed + orb.holdLevel * 1.6 + agent.expand * 0.6 - orb.speed) * 0.06;
                 orb.turbulence += (orb.targetTurbulence + orb.holdLevel * 0.14 - orb.turbulence) * 0.06;
-                orb.scale += (orb.targetScale + orb.holdLevel * 0.06 - orb.scale) * 0.06;
+                orb.scale += (orb.targetScale + orb.holdLevel * 0.06 + agent.expand * 0.12 - orb.scale) * 0.06;
                 orb.time += 0.02 * orb.speed;
 
                 ctx.clearRect(0, 0, orb.width, orb.height);
@@ -2069,6 +2629,7 @@
                 // Storytelling visuals & live per-site traffic conduits
                 drawStoryVisuals(cx, cy, radius, hue);
                 drawSiteTraffic(cx, cy, radius);
+                drawAgentTraffic(cx, cy, radius);
 
                 // Plasma Core & 3D Lattice (2D fallback when WebGL is unavailable)
                 if (!orb3d.ready) {
@@ -2098,6 +2659,9 @@
                 ctx.stroke();
                 ctx.restore();
                 }
+
+                // Window into the site the agent is reviewing
+                drawAgentLens(cx, cy, radius);
 
                 requestAnimationFrame(render);
             }
@@ -2150,6 +2714,8 @@
                 focusButtons.forEach(btn => {
                     btn.addEventListener('click', () => setFocus(btn.dataset.focus));
                 });
+
+                if (agentToggle) agentToggle.addEventListener('click', () => setAgentOn(!agent.on));
 
                 logToggleBtn.addEventListener('click', () => {
                     activityDrawer.classList.toggle('hidden');
@@ -2247,6 +2813,7 @@
     if(x==='changetoken'||x==='setadminpassword')return A+': a password or access setting was changed';
     return A+': Unrecognized request';
   }
+  window.cabSay=say;
   function rowEl(r){
     var d=el('div','flex flex-wrap items-baseline gap-x-2 border-b border-zinc-900 pb-1');
     var bad=r.src==='request'&&r.status>=400;
