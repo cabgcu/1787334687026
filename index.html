@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CAB Security</title>
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <meta name="referrer" content="no-referrer">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://csutspaxezmjbqynpprt.supabase.co; img-src data: blob:; media-src data: blob:; base-uri 'none'; form-action 'none'">
+    <title>Sign in</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load Inter font -->
@@ -169,6 +172,43 @@
             </div>
         </aside>
     </main>
+
+    <!-- Insight panel: live activity, files in/out, data (read-only, loads only after login) -->
+    <section id="insight" class="hidden w-full max-w-4xl mx-auto px-4 pb-10 relative z-10">
+      <div class="rounded-2xl bg-zinc-950/90 border border-zinc-800/90 p-4">
+        <div class="flex flex-wrap items-center gap-2 mb-3">
+          <button data-tab="activity" class="itab px-3 py-1 rounded-lg text-xs border border-zinc-700 text-slate-200">What people are doing</button>
+          <button data-tab="files" class="itab px-3 py-1 rounded-lg text-xs border border-zinc-700 text-slate-400">Files in and out</button>
+          <button data-tab="data" class="itab px-3 py-1 rounded-lg text-xs border border-zinc-700 text-slate-400">Sheet data</button>
+          <span id="in-status" class="ml-auto text-[10px] font-mono text-slate-500"></span>
+        </div>
+        <div id="in-activity">
+          <div id="in-apps" class="flex flex-wrap gap-1.5 mb-2"></div>
+          <div id="in-act-list" class="max-h-96 overflow-y-auto space-y-1 text-[12px]"></div>
+          <p class="mt-2 text-[10px] text-slate-500">Shows what reaches the servers: sign-ins, page loads, saves, uploads, emails, plus each app's own activity log (marketing and timesheet name the person). Clicks that stay inside the browser never reach a server and are not visible. Commuter, VIP, receipts and portal requests do not record who did it, only the action, time and IP.</p>
+        </div>
+        <div id="in-files" class="hidden">
+          <div id="in-buckets" class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3"></div>
+          <div class="text-[11px] uppercase tracking-wider text-slate-400 mb-1">Files going in (newest uploads)</div>
+          <div id="in-objects" class="max-h-56 overflow-y-auto space-y-1 text-[12px] mb-3"></div>
+          <div class="text-[11px] uppercase tracking-wider text-slate-400 mb-1">Upload, delete and download-link requests</div>
+          <div id="in-fev" class="max-h-40 overflow-y-auto space-y-1 text-[12px] mb-3"></div>
+          <div class="text-[11px] uppercase tracking-wider text-slate-400 mb-1">Emails sent out</div>
+          <div id="in-sends" class="max-h-40 overflow-y-auto space-y-1 text-[12px]"></div>
+        </div>
+        <div id="in-data" class="hidden">
+          <div class="flex flex-wrap gap-2 mb-2">
+            <select id="in-table" class="bg-black border border-zinc-700 rounded-lg text-xs px-2 py-1 text-slate-200"></select>
+            <input id="in-q" placeholder="search" class="bg-black border border-zinc-700 rounded-lg text-xs px-2 py-1 text-slate-200 w-40">
+            <button id="in-prev" class="px-2 py-1 rounded-lg text-xs border border-zinc-700">Prev</button>
+            <button id="in-next" class="px-2 py-1 rounded-lg text-xs border border-zinc-700">Next</button>
+            <span id="in-count" class="text-[10px] font-mono text-slate-500 self-center"></span>
+          </div>
+          <div class="overflow-auto max-h-96 border border-zinc-800 rounded-lg"><table id="in-grid" class="text-[11px] w-full"></table></div>
+          <p class="mt-2 text-[10px] text-slate-500">Read-only view of the same tables the CABGCU Database Sheet mirrors. Passwords, tokens and keys are always masked.</p>
+        </div>
+      </div>
+    </section>
 
     <!-- Interactive Storytelling Orb & Per-Site Traffic Hub Logic -->
     <script>
@@ -1070,8 +1110,8 @@
                 if (!o) {
                     o = document.createElement('div');
                     o.id = 'login-overlay';
-                    o.className = 'fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4';
-                    o.innerHTML = '<form id="login-form" class="w-full max-w-xs p-5 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-3"><div class="text-sm uppercase tracking-widest text-sky-200">CAB Security</div><input id="login-user" name="username" value="admin" autocomplete="username" class="w-full bg-transparent border border-zinc-800 rounded-xl px-3 py-2 text-sm"><input id="login-pw" name="password" type="password" autocomplete="current-password" placeholder="Admin password" class="w-full bg-transparent border border-zinc-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-sky-400/50"><button class="w-full px-4 py-2.5 rounded-xl bg-sky-500/20 border border-sky-400/30 text-sky-200 text-sm">Sign in</button><p id="login-err" class="text-xs text-red-400 min-h-[1rem]"></p></form>';
+                    o.className = 'fixed inset-0 z-[60] bg-black flex items-center justify-center p-4';
+                    o.innerHTML = '<form id="login-form" class="w-full max-w-xs p-5 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-3"><div class="text-sm uppercase tracking-widest text-sky-200">Sign in</div><input id="login-user" name="username" value="admin" autocomplete="username" class="w-full bg-transparent border border-zinc-800 rounded-xl px-3 py-2 text-sm"><input id="login-pw" name="password" type="password" autocomplete="current-password" placeholder="Admin password" class="w-full bg-transparent border border-zinc-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-sky-400/50"><button class="w-full px-4 py-2.5 rounded-xl bg-sky-500/20 border border-sky-400/30 text-sky-200 text-sm">Sign in</button><p id="login-err" class="text-xs text-red-400 min-h-[1rem]"></p></form>';
                     document.body.appendChild(o);
                     document.getElementById('login-form').addEventListener('submit', async (e) => {
                         e.preventDefault();
@@ -1675,5 +1715,122 @@
             };
         })();
     </script>
+<script>
+(function(){
+  var GW='https://csutspaxezmjbqynpprt.supabase.co/functions/v1/security-gateway';
+  var $=function(i){return document.getElementById(i)};
+  var NAMES={marketing:'Marketing',commuter:'Commuter',vip:'VIP',receipts:'Receipts',portal:'Portal',timesheet:'Timesheet','commuter-auth':'Commuter',
+    'commuter-state':'Commuter'};
+  var tab='activity', appF='', page=0, PS=25, busy=false;
+  function tok(){return sessionStorage.getItem('sec_token')||''}
+  async function call(action,extra){
+    var r=await fetch(GW,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok()},body:JSON.stringify(Object.assign({action:action},extra||{}))});
+    if(r.status===401){return null}
+    return r.json().catch(function(){return null});
+  }
+  function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
+  function ago(ts){var s=Math.max(0,(Date.now()-new Date(ts))/1000);if(s<60)return Math.floor(s)+'s ago';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return new Date(ts).toLocaleDateString()}
+  function when(ts){return new Date(ts).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit'})}
+  function kb(n){n=+n||0;return n>1048576?(n/1048576).toFixed(1)+' MB':Math.round(n/1024)+' KB'}
+  function app(a){return NAMES[a]||a}
+  var TBL={users:'user accounts',user_activity_log:'activity log',push_subscriptions:'notification settings',app_state:'app data',tasks:'tasks',comments:'comments',receipts:'receipts',settings:'settings',roster:'roster',submissions:'timesheets',guests:'guest list',groups:'groups',events:'events',secrets:'private settings',live_ticket_settings:'live ticket settings'};
+  function tn(t){return TBL[t]||(t||'data').replace(/_/g,' ')}
+  // Plain-English description of one row
+  function say(r){
+    var a=r.app, x=(r.action||'').toLowerCase(), A=app(a);
+    if(r.src==='app log'){
+      var who=r.who||'Someone';
+      if(a==='timesheet'){var m={add:'added hours',edit:'changed hours',update:'changed hours',delete:'deleted hours',remove:'removed hours',submit:'submitted a timesheet',approve:'approved a timesheet',reject:'sent a timesheet back'};
+        return 'Timesheet: '+who+' '+(m[x]||('did "'+x+'" on')) +(r.detail?' ('+r.detail+')':'')}
+      var mm={login:'signed in',logout:'signed out',create:'created a task',update:'updated a task',move:'moved a task',comment:'commented on a task',delete:'deleted a task',complete:'completed a task',assign:'assigned a task'};
+      return 'Marketing: '+who+' '+(mm[x]||('did "'+x+'"'))+(r.detail&&x!=='login'?' - '+r.detail:'');
+    }
+    var ok=(r.status>=200&&r.status<300);
+    if(x==='login'){var who={marketing:'staff',commuter:'a commuter',vip:'an admin',receipts:'an admin',portal:'an admin',timesheet:'a user'}[a]||'someone';
+      return A+': '+who+(ok?' signed in':' failed to sign in')}
+    if(a==='marketing'){
+      if(x==='load')return A+': a staff member opened the board';
+      if(x==='save')return A+': a staff member saved board changes';
+      if(x==='table'){ var o=r.action2||'';
+        return A+': staff '+({update:'updated',insert:'added to',upsert:'saved',delete:'removed from'}[(r.op||'')]||'used')+' '+tn(r.detail)}
+    }
+    if(a==='commuter'||a==='commuter-auth'||a==='commuter-state'){
+      var o2={read:'opened the commuter app',version:'checked for an app update',write:'saved commuter data',writeBackup:'saved a backup',readBackups:'looked at backups'}[r.action];
+      if(o2)return A+': someone '+o2;
+    }
+    if(x==='sendemail')return A+': an email was sent';
+    if(x==='uploadurl')return A+': a file upload was started';
+    if(x==='storageremove'||x==='removefile'||x==='scriptremovefile')return A+': a file was deleted';
+    if(x==='scriptupdatephotos')return A+': receipt photos were updated';
+    if(x==='get'||x==='view'||x==='click'){return 'Portal: '+({get:'a visitor opened the portal',view:'a visitor viewed a page',click:'a visitor clicked a link'}[x])}
+    if(x==='save'&&a==='portal')return 'Portal: portal settings were saved';
+    if(x==='q'){
+      var T={receipts:'receipts',settings:'settings',roster:'the roster',submissions:'timesheets',guests:'the guest list',groups:'groups',events:'events',secrets:'private settings',live_ticket_settings:'live ticket settings'}[r.detail];
+      return A+': '+({receipts:'an admin',timesheet:'a user',vip:'an admin'}[a]||'someone')+' looked up '+(T||'data');
+    }
+    if(x==='changetoken'||x==='setadminpassword')return A+': a password or access setting was changed';
+    return A+': Unrecognized request';
+  }
+  function rowEl(r){
+    var d=el('div','flex flex-wrap items-baseline gap-x-2 border-b border-zinc-900 pb-1');
+    var bad=r.src==='request'&&r.status>=400;
+    d.appendChild(el('span','text-slate-500 font-mono text-[10px] w-16 shrink-0',ago(r.ts)));
+    d.appendChild(el('span',bad?'text-amber-300':'text-slate-200',say(r)));
+    var m=[]; if(r.ip)m.push(r.ip); if(bad)m.push('refused ('+r.status+')'); m.push(when(r.ts));
+    d.appendChild(el('span','text-slate-600 font-mono text-[10px]',m.join(' · ')));
+    return d;
+  }
+  async function loadActivity(){
+    var j=await call('activity',{app:appF,limit:150}); if(!j)return;
+    var bar=$('in-apps'); bar.textContent='';
+    ['','marketing','commuter','vip','receipts','portal','timesheet'].forEach(function(k){
+      var b=el('button','px-2 py-0.5 rounded-md text-[11px] border '+(k===appF?'border-sky-400 text-sky-200':'border-zinc-700 text-slate-400'),k?app(k):'All sites');
+      b.onclick=function(){appF=k;loadActivity()};bar.appendChild(b)});
+    var L=$('in-act-list'); L.textContent='';
+    if(!j.activity.length)L.appendChild(el('div','text-slate-500','Nothing yet.'));
+    j.activity.forEach(function(r){
+      if(r.app==='commuter-auth'||r.app==='commuter-state')r.app='commuter';
+      L.appendChild(rowEl(r))});
+  }
+  async function loadFiles(){
+    var j=await call('files'); if(!j)return;
+    var B=$('in-buckets'); B.textContent='';
+    var BN={'receipts-photos':'Receipt photos','timesheet-camera':'Disposable camera','vip-banners':'VIP banners','portal-backgrounds':'Portal backgrounds'};
+    j.buckets.forEach(function(b){var c=el('div','p-2 rounded-lg border border-zinc-800');c.appendChild(el('div','text-xs text-slate-200',BN[b.bucket]||b.bucket));c.appendChild(el('div','text-[10px] font-mono text-slate-500',b.files+' files · '+kb(b.bytes)));c.appendChild(el('div','text-[10px] font-mono text-slate-600','latest '+ago(b.latest)));B.appendChild(c)});
+    var O=$('in-objects'); O.textContent='';
+    j.objects.forEach(function(o){var d=el('div','flex gap-2 border-b border-zinc-900 pb-1');d.appendChild(el('span','text-slate-500 font-mono text-[10px] w-16 shrink-0',ago(o.created_at)));d.appendChild(el('span','text-slate-200',(BN[o.bucket]||o.bucket)+': '+(o.mime||'file')+' uploaded'));d.appendChild(el('span','text-slate-600 font-mono text-[10px] truncate',(o.name||'')+' · '+kb(o.size)));O.appendChild(d)});
+    var F=$('in-fev'); F.textContent=''; if(!j.file_events.length)F.appendChild(el('div','text-slate-500','None recorded yet.'));
+    j.file_events.forEach(function(e){e.src='request';F.appendChild(rowEl(e))});
+    var S=$('in-sends'); S.textContent=''; if(!j.sends.length)S.appendChild(el('div','text-slate-500','No emails sent since logging began.'));
+    j.sends.forEach(function(e){var d=el('div','border-b border-zinc-900 pb-1');d.appendChild(el('span','text-slate-500 font-mono text-[10px] mr-2',ago(e.ts)));d.appendChild(el('span','text-slate-200',app(e.app)+': email sent'+(e.subject?' - '+e.subject:'')));if(e.recipients)d.appendChild(el('span','text-slate-600 font-mono text-[10px] ml-2',e.recipients+' recipient(s)'));S.appendChild(d)});
+  }
+  var tablesLoaded=false;
+  async function loadData(){
+    if(!tablesLoaded){var t=await call('tables'); if(!t)return; var s=$('in-table'); s.textContent='';
+      t.tables.forEach(function(x){var o=el('option',null,x.t+' ('+x.rows+')');o.value=x.t;s.appendChild(o)}); tablesLoaded=true}
+    var tb=$('in-table').value; if(!tb)return;
+    var j=await call('browse',{table:tb,limit:PS,offset:page*PS,q:$('in-q').value}); if(!j)return;
+    $('in-count').textContent=(j.total?(page*PS+1):0)+'-'+Math.min(j.total,(page+1)*PS)+' of '+j.total;
+    var g=$('in-grid'); g.textContent=''; var rows=j.rows||[]; if(!rows.length){g.appendChild(el('tr',null,'No rows'));return}
+    var cols=Object.keys(rows[0]); var h=el('tr');cols.forEach(function(c){h.appendChild(el('th','text-left px-2 py-1 text-slate-400 sticky top-0 bg-zinc-950 whitespace-nowrap',c))});g.appendChild(h);
+    rows.forEach(function(r){var tr=el('tr','border-t border-zinc-900');cols.forEach(function(c){var v=r[c];tr.appendChild(el('td','px-2 py-1 text-slate-300 align-top max-w-[260px] truncate',v==null?'':String(v)))});g.appendChild(tr)});
+  }
+  async function refresh(){
+    if(busy||document.hidden||!tok())return; busy=true;
+    try{ if(tab==='activity')await loadActivity(); else if(tab==='files')await loadFiles(); else if(page===0&&document.activeElement!==$('in-q'))await loadData();
+      $('in-status').textContent='live · updated '+new Date().toLocaleTimeString(); }catch(e){} busy=false;
+  }
+  function setTab(t){tab=t;['activity','files','data'].forEach(function(k){$('in-'+k).classList.toggle('hidden',k!==t)});
+    document.querySelectorAll('.itab').forEach(function(b){b.className='itab px-3 py-1 rounded-lg text-xs border '+(b.dataset.tab===t?'border-sky-400 text-sky-200':'border-zinc-700 text-slate-400')});
+    busy=false;refresh()}
+  document.querySelectorAll('.itab').forEach(function(b){b.onclick=function(){setTab(b.dataset.tab)}});
+  $('in-table').onchange=function(){page=0;loadData()};
+  $('in-q').onkeydown=function(e){if(e.key==='Enter'){page=0;loadData()}};
+  $('in-prev').onclick=function(){if(page>0){page--;loadData()}};
+  $('in-next').onclick=function(){page++;loadData()};
+  setInterval(function(){var on=!!tok();$('insight').classList.toggle('hidden',!on);if(on)refresh()},8000);
+  setTimeout(function(){var on=!!tok();$('insight').classList.toggle('hidden',!on);if(on)refresh()},1500);
+})();
+</script>
 </body>
 </html>
