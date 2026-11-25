@@ -5,10 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow, noarchive">
     <meta name="referrer" content="no-referrer">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://csutspaxezmjbqynpprt.supabase.co; img-src data: blob:; media-src data: blob:; base-uri 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://csutspaxezmjbqynpprt.supabase.co; img-src data: blob:; media-src data: blob:; base-uri 'none'; form-action 'none'">
     <title>Sign in</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Three.js r128 for the WebGL plasma orb -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <!-- Load Inter font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -76,7 +78,9 @@
     <main class="relative flex-1 flex flex-col items-center justify-center w-full max-w-4xl mx-auto px-4 py-2 pb-8">
         <!-- Responsive Orb & Site Traffic Canvas -->
         <div id="orb-stage" class="relative w-full h-[58vh] min-h-[380px] max-h-[620px] flex items-center justify-center cursor-pointer select-none touch-none">
-            <canvas id="orb-canvas" class="w-full h-full block"></canvas>
+            <!-- WebGL plasma orb (behind) + 2D traffic/story overlay (front) -->
+            <canvas id="orb-gl" class="absolute inset-0 w-full h-full block pointer-events-none" style="-webkit-mask-image: radial-gradient(ellipse closest-side, #000 72%, transparent 100%); mask-image: radial-gradient(ellipse closest-side, #000 72%, transparent 100%);"></canvas>
+            <canvas id="orb-canvas" class="relative w-full h-full block"></canvas>
 
             <!-- Subtle Traffic Flow Legend (shown once real site data is loaded) -->
             <div id="flow-legend" class="hidden pointer-events-none absolute top-1 right-2 px-2.5 py-1 rounded-full bg-zinc-950/80 border border-zinc-800/80 text-[10px] text-slate-400 backdrop-blur-sm flex items-center gap-3">
@@ -378,6 +382,7 @@
                     alpha: Math.min(0.95, 0.72 * strength),
                     hue: customHue
                 });
+                if (typeof orb3d !== 'undefined') orb3d.surge = Math.min(1.2, Math.max(orb3d.surge, strength));
                 playTone(280 + strength * 50, 0.26, 'triangle');
                 if (orbHint) orbHint.classList.add('opacity-0');
             }
@@ -1198,6 +1203,7 @@
                 orb.cx = orb.width / 2;
                 orb.cy = orb.height / 2;
                 updateOrbMetrics();
+                resizeOrb3D();
             }
 
             /**
@@ -1540,6 +1546,468 @@
             }
 
             /**
+             * WebGL Holographic Plasma Orb (Three.js)
+             * Layered behind the 2D traffic canvas. Pixel-space orthographic camera so the
+             * orb lines up exactly with orb.cx/cy/baseRadius used by the 2D overlays.
+             * Falls back to the 2D plasma drawing if WebGL / Three.js is unavailable.
+             */
+            const NOISE_GLSL = `
+                vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+                vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+                vec4 permute(vec4 x) { return mod289(((x * 34.0) + 1.0) * x); }
+                vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+                float snoise(vec3 v) {
+                    const vec2 C = vec2(1.0 / 6.0, 1.0 / 3.0);
+                    const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+                    vec3 i  = floor(v + dot(v, C.yyy));
+                    vec3 x0 = v - i + dot(i, C.xxx);
+                    vec3 g = step(x0.yzx, x0.xyz);
+                    vec3 l = 1.0 - g;
+                    vec3 i1 = min(g.xyz, l.zxy);
+                    vec3 i2 = max(g.xyz, l.zxy);
+                    vec3 x1 = x0 - i1 + C.xxx;
+                    vec3 x2 = x0 - i2 + C.yyy;
+                    vec3 x3 = x0 - D.yyy;
+                    i = mod289(i);
+                    vec4 p = permute(permute(permute(
+                                i.z + vec4(0.0, i1.z, i2.z, 1.0))
+                              + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+                              + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+                    float n_ = 0.142857142857;
+                    vec3 ns = n_ * D.wyz - D.xzx;
+                    vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+                    vec4 x_ = floor(j * ns.z);
+                    vec4 y_ = floor(j - 7.0 * x_);
+                    vec4 x = x_ * ns.x + ns.yyyy;
+                    vec4 y = y_ * ns.x + ns.yyyy;
+                    vec4 h = 1.0 - abs(x) - abs(y);
+                    vec4 b0 = vec4(x.xy, y.xy);
+                    vec4 b1 = vec4(x.zw, y.zw);
+                    vec4 s0 = floor(b0) * 2.0 + 1.0;
+                    vec4 s1 = floor(b1) * 2.0 + 1.0;
+                    vec4 sh = -step(h, vec4(0.0));
+                    vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
+                    vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
+                    vec3 p0 = vec3(a0.xy, h.x);
+                    vec3 p1 = vec3(a0.zw, h.y);
+                    vec3 p2 = vec3(a1.xy, h.z);
+                    vec3 p3 = vec3(a1.zw, h.w);
+                    vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
+                    p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+                    vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+                    m = m * m;
+                    return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+                }
+                float ridgedFbm(vec3 p) {
+                    float value = 0.0;
+                    float amp = 0.55;
+                    float freq = 1.0;
+                    for (int i = 0; i < 4; i++) {
+                        float n = 1.0 - abs(snoise(p * freq));
+                        value += n * n * amp;
+                        freq *= 2.05;
+                        amp *= 0.48;
+                    }
+                    return value;
+                }
+            `;
+
+            const SHELL_VS = `
+                uniform float uTime;
+                uniform float uTurbulence;
+                uniform float uSurge;
+                uniform float uDisplacementScale;
+                varying vec3 vNormal;
+                varying vec3 vViewPosition;
+                varying vec3 vLocalPos;
+                varying float vRidge;
+                ${NOISE_GLSL}
+                void main() {
+                    vec3 p = normalize(position);
+                    float t = uTime * 0.28;
+                    float r1 = ridgedFbm(p * 1.9 + vec3(t, -t * 0.7, t * 0.5));
+                    float r2 = snoise(p * 3.8 - vec3(t * 1.2, t * 0.9, -t * 0.6));
+                    float displacement = (r1 * 0.75 + r2 * 0.25) * uDisplacementScale * uTurbulence;
+                    displacement += sin(p.y * 8.0 - uTime * 6.0) * 0.06 * uSurge;
+                    vec3 displacedPos = position + normal * displacement;
+                    vRidge = r1;
+                    vLocalPos = displacedPos;
+                    vec4 mvPosition = modelViewMatrix * vec4(displacedPos, 1.0);
+                    vViewPosition = vec3(0.0, 0.0, 1.0);
+                    vNormal = normalize(normalMatrix * normal);
+                    gl_Position = projectionMatrix * mvPosition;
+                }
+            `;
+
+            const SHELL_FS = `
+                uniform float uTime;
+                uniform float uIntensity;
+                uniform float uSurge;
+                uniform float uOpacity;
+                uniform vec3 uColorDeep;
+                uniform vec3 uColorMid;
+                uniform vec3 uColorHot;
+                varying vec3 vNormal;
+                varying vec3 vViewPosition;
+                varying vec3 vLocalPos;
+                varying float vRidge;
+                ${NOISE_GLSL}
+                void main() {
+                    vec3 viewDir = normalize(vViewPosition);
+                    vec3 normal = normalize(vNormal);
+                    float fresnel = pow(1.0 - abs(dot(viewDir, normal)), 2.4);
+                    float veinNoise = 1.0 - abs(snoise(vLocalPos * 2.4 + vec3(0.0, uTime * 0.45, uTime * 0.25)));
+                    float electricVeins = pow(smoothstep(0.62, 0.98, veinNoise), 3.0);
+                    float fineVein = 1.0 - abs(snoise(vLocalPos * 5.2 - vec3(uTime * 0.6, 0.0, uTime * 0.4)));
+                    float fineSpark = pow(smoothstep(0.75, 0.99, fineVein), 4.0);
+                    float ridgeHighlight = smoothstep(0.45, 1.15, vRidge);
+                    vec3 color = mix(uColorDeep, uColorMid, clamp(ridgeHighlight * 0.85 + fresnel * 0.65, 0.0, 1.0));
+                    color = mix(color, uColorHot, clamp(fresnel * 0.72 + electricVeins * 0.85 + fineSpark * 0.6, 0.0, 1.0));
+                    color *= uIntensity + uSurge * 0.85;
+                    float alpha = (fresnel * 0.85 + ridgeHighlight * 0.22 + electricVeins * 0.65 + fineSpark * 0.45) * uOpacity;
+                    gl_FragColor = vec4(color, clamp(alpha, 0.0, 0.95));
+                }
+            `;
+
+            const CORE_VS = `
+                uniform float uTime;
+                uniform float uSurge;
+                varying vec3 vNormal;
+                varying vec3 vPos;
+                ${NOISE_GLSL}
+                void main() {
+                    float pulse = snoise(position * 2.5 + uTime * 1.4) * 0.14;
+                    vec3 pos = position + normal * (pulse + uSurge * 0.18);
+                    vPos = pos;
+                    vNormal = normalize(normalMatrix * normal);
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+                }
+            `;
+
+            const CORE_FS = `
+                uniform float uTime;
+                uniform float uIntensity;
+                uniform float uSurge;
+                uniform vec3 uColorMid;
+                uniform vec3 uColorHot;
+                varying vec3 vNormal;
+                varying vec3 vPos;
+                ${NOISE_GLSL}
+                void main() {
+                    float facing = max(normalize(vNormal).z, 0.0);
+                    float n = snoise(vPos * 3.5 + vec3(uTime * 0.8, -uTime * 0.6, uTime * 0.5));
+                    float coreGlow = pow(facing, 1.15) + n * 0.25;
+                    vec3 color = mix(uColorMid, uColorHot, smoothstep(0.15, 0.85, coreGlow));
+                    color += mix(uColorHot, vec3(1.0), 0.4) * 0.6 * pow(facing, 3.0);
+                    color *= (uIntensity * 1.25 + uSurge * 0.9);
+                    float alpha = smoothstep(0.0, 0.75, facing + 0.2);
+                    gl_FragColor = vec4(color, alpha);
+                }
+            `;
+
+            const PARTICLE_VS = `
+                uniform float uTime;
+                uniform float uPointScale;
+                uniform float uSurge;
+                attribute float aScale;
+                attribute float aPhase;
+                attribute float aSpeed;
+                varying float vAlpha;
+                void main() {
+                    vec3 pos = position;
+                    float angle = uTime * aSpeed * 0.35 + aPhase;
+                    float cosA = cos(angle);
+                    float sinA = sin(angle);
+                    vec3 rotated = vec3(
+                        pos.x * cosA - pos.z * sinA,
+                        pos.y + sin(uTime * 1.2 + aPhase) * 0.14,
+                        pos.x * sinA + pos.z * cosA
+                    );
+                    rotated *= (1.0 + uSurge * 0.16);
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(rotated, 1.0);
+                    vAlpha = 0.55 + 0.45 * sin(uTime * 3.2 + aPhase * 4.0);
+                    gl_PointSize = aScale * uPointScale;
+                }
+            `;
+
+            const PARTICLE_FS = `
+                uniform vec3 uColorParticle;
+                uniform vec3 uColorHot;
+                uniform float uIntensity;
+                varying float vAlpha;
+                void main() {
+                    float dist = length(gl_PointCoord - vec2(0.5));
+                    if (dist > 0.5) discard;
+                    float glow = pow(1.0 - dist * 2.0, 2.2);
+                    vec3 color = mix(uColorParticle, uColorHot, pow(1.0 - dist * 2.0, 4.0)) * uIntensity;
+                    gl_FragColor = vec4(color, glow * vAlpha * 0.9);
+                }
+            `;
+
+            // World-unit radius of the outer shell silhouette; mapped onto orb.baseRadius pixels
+            const ORB_WORLD_RADIUS = 2.15;
+
+            const orb3d = {
+                ready: false,
+                renderer: null, scene: null, camera: null, group: null,
+                core: null, inner: null, outer: null, wire: null, halo: null, particles: null,
+                filaments: [],
+                simTime: 0,
+                surge: 0,
+                rotX: 0.15, rotY: 0,
+                lastTs: 0,
+                colors: {
+                    deep: null, mid: null, hot: null, particle: null
+                }
+            };
+
+            function hueColor(h, s, l) {
+                const c = new THREE.Color();
+                c.setHSL((((h % 360) + 360) % 360) / 360, s, l);
+                return c;
+            }
+
+            function makeGlowTexture() {
+                const size = 256;
+                const c = document.createElement('canvas');
+                c.width = c.height = size;
+                const g = c.getContext('2d');
+                const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+                grad.addColorStop(0.0, 'rgba(255, 255, 255, 0.95)');
+                grad.addColorStop(0.22, 'rgba(255, 255, 255, 0.5)');
+                grad.addColorStop(0.55, 'rgba(255, 255, 255, 0.14)');
+                grad.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
+                g.fillStyle = grad;
+                g.fillRect(0, 0, size, size);
+                return new THREE.CanvasTexture(c);
+            }
+
+            function initOrb3D() {
+                const glCanvas = document.getElementById('orb-gl');
+                if (!glCanvas || typeof THREE === 'undefined') return;
+                try {
+                    const renderer = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+                    renderer.setClearColor(0x000000, 0);
+                    const scene = new THREE.Scene();
+                    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 6000);
+                    camera.position.set(0, 0, 3000);
+                    camera.lookAt(0, 0, 0);
+
+                    const group = new THREE.Group();
+                    scene.add(group);
+
+                    const C = orb3d.colors;
+                    C.deep = hueColor(orb.hue, 1, 0.22);
+                    C.mid = hueColor(orb.hue, 1, 0.5);
+                    C.hot = hueColor(orb.hue - 8, 1, 0.92);
+                    C.particle = hueColor(orb.hue - 6, 1, 0.6);
+
+                    const additive = { transparent: true, blending: THREE.AdditiveBlending, depthWrite: false };
+
+                    // Halo
+                    const halo = new THREE.Sprite(new THREE.SpriteMaterial(Object.assign({ map: makeGlowTexture(), color: C.mid, opacity: 0.6 }, additive)));
+                    halo.scale.set(7.2, 7.2, 1);
+                    group.add(halo);
+
+                    // Core
+                    const core = new THREE.Mesh(
+                        new THREE.IcosahedronGeometry(0.72, 18),
+                        new THREE.ShaderMaterial(Object.assign({
+                            vertexShader: CORE_VS, fragmentShader: CORE_FS,
+                            uniforms: {
+                                uTime: { value: 0 }, uIntensity: { value: 1.15 }, uSurge: { value: 0 },
+                                uColorMid: { value: C.mid }, uColorHot: { value: C.hot }
+                            }
+                        }, additive))
+                    );
+                    group.add(core);
+
+                    // Lightning filaments
+                    const filGroup = new THREE.Group();
+                    group.add(filGroup);
+                    const segments = 14;
+                    for (let i = 0; i < 34; i++) {
+                        const theta = Math.random() * Math.PI * 2;
+                        const phi = Math.acos(2 * Math.random() - 1);
+                        const dir = new THREE.Vector3(Math.sin(phi) * Math.cos(theta), Math.sin(phi) * Math.sin(theta), Math.cos(phi));
+                        const up = Math.abs(dir.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+                        const tA = new THREE.Vector3().crossVectors(dir, up).normalize();
+                        const tB = new THREE.Vector3().crossVectors(dir, tA).normalize();
+                        const geo = new THREE.BufferGeometry();
+                        geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array((segments + 1) * 3), 3));
+                        const bright = i % 3 === 0;
+                        const line = new THREE.Line(geo, new THREE.LineBasicMaterial(Object.assign({ color: bright ? C.hot : C.mid, opacity: bright ? 0.78 : 0.45 }, additive)));
+                        filGroup.add(line);
+                        orb3d.filaments.push({
+                            line, dir, tA, tB, segments, bright,
+                            length: 1.55 + Math.random() * 0.85,
+                            phase: Math.random() * Math.PI * 2,
+                            freq: 1.5 + Math.random() * 2.5,
+                            baseOpacity: bright ? 0.78 : 0.42
+                        });
+                    }
+
+                    // Shells
+                    const makeShell = (r, detail, disp, opacity, t0) => new THREE.Mesh(
+                        new THREE.IcosahedronGeometry(r, detail),
+                        new THREE.ShaderMaterial(Object.assign({
+                            vertexShader: SHELL_VS, fragmentShader: SHELL_FS,
+                            uniforms: {
+                                uTime: { value: t0 }, uTurbulence: { value: 1 }, uSurge: { value: 0 },
+                                uDisplacementScale: { value: disp }, uIntensity: { value: 1.15 }, uOpacity: { value: opacity },
+                                uColorDeep: { value: C.deep }, uColorMid: { value: C.mid }, uColorHot: { value: C.hot }
+                            },
+                            side: THREE.DoubleSide
+                        }, additive))
+                    );
+                    const inner = makeShell(1.6, 28, 0.36, 0.88, 0);
+                    const outer = makeShell(1.92, 22, 0.46, 0.45, 12.5);
+                    group.add(inner);
+                    group.add(outer);
+
+                    // Holographic wireframe accent
+                    const wire = new THREE.Mesh(
+                        new THREE.IcosahedronGeometry(1.78, 3),
+                        new THREE.MeshBasicMaterial(Object.assign({ color: C.mid, wireframe: true, opacity: 0.08 }, additive))
+                    );
+                    group.add(wire);
+
+                    // Particle field
+                    const count = 1100;
+                    const pos = new Float32Array(count * 3);
+                    const scales = new Float32Array(count);
+                    const phases = new Float32Array(count);
+                    const speeds = new Float32Array(count);
+                    for (let i = 0; i < count; i++) {
+                        const r = Math.random() > 0.22 ? 1.75 + Math.pow(Math.random(), 1.6) * 1.6 : 0.6 + Math.random() * 1.2;
+                        const theta = Math.random() * Math.PI * 2;
+                        const phi = Math.acos(2 * Math.random() - 1);
+                        pos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+                        pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+                        pos[i * 3 + 2] = r * Math.cos(phi);
+                        scales[i] = 1.4 + Math.random() * 4.2;
+                        phases[i] = Math.random() * Math.PI * 2;
+                        speeds[i] = (0.35 + Math.random() * 1.1) * (Math.random() > 0.5 ? 1 : -1);
+                    }
+                    const pGeo = new THREE.BufferGeometry();
+                    pGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+                    pGeo.setAttribute('aScale', new THREE.BufferAttribute(scales, 1));
+                    pGeo.setAttribute('aPhase', new THREE.BufferAttribute(phases, 1));
+                    pGeo.setAttribute('aSpeed', new THREE.BufferAttribute(speeds, 1));
+                    const particles = new THREE.Points(pGeo, new THREE.ShaderMaterial(Object.assign({
+                        vertexShader: PARTICLE_VS, fragmentShader: PARTICLE_FS,
+                        uniforms: {
+                            uTime: { value: 0 }, uPointScale: { value: 2 }, uSurge: { value: 0 }, uIntensity: { value: 1.15 },
+                            uColorParticle: { value: C.particle }, uColorHot: { value: C.hot }
+                        }
+                    }, additive)));
+                    group.add(particles);
+
+                    Object.assign(orb3d, { renderer, scene, camera, group, core, inner, outer, wire, halo, particles, ready: true });
+                    resizeOrb3D();
+                } catch (err) {
+                    console.warn('WebGL orb unavailable, using 2D fallback:', err);
+                    orb3d.ready = false;
+                }
+            }
+
+            function resizeOrb3D() {
+                if (!orb3d.ready || !orb.width || !orb.height) return;
+                const w = orb.width, h = orb.height;
+                orb3d.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+                orb3d.renderer.setSize(w, h, false);
+                const cam = orb3d.camera;
+                cam.left = -w / 2; cam.right = w / 2; cam.top = h / 2; cam.bottom = -h / 2;
+                cam.updateProjectionMatrix();
+            }
+
+            function updateFilaments3D(t, turbulence) {
+                for (let i = 0; i < orb3d.filaments.length; i++) {
+                    const f = orb3d.filaments[i];
+                    const attr = f.line.geometry.attributes.position;
+                    const arr = attr.array;
+                    for (let s = 0; s <= f.segments; s++) {
+                        const k = s / f.segments;
+                        const dist = 0.22 + k * f.length * 0.86 * (1.0 + orb3d.surge * 0.25);
+                        const env = Math.sin(k * Math.PI);
+                        const jA = Math.sin(k * 7.0 - t * f.freq + f.phase) * 0.22 * env * turbulence;
+                        const jB = Math.cos(k * 9.0 + t * f.freq * 1.2 + f.phase) * 0.22 * env * turbulence;
+                        arr[s * 3] = f.dir.x * dist + f.tA.x * jA + f.tB.x * jB;
+                        arr[s * 3 + 1] = f.dir.y * dist + f.tA.y * jA + f.tB.y * jB;
+                        arr[s * 3 + 2] = f.dir.z * dist + f.tA.z * jA + f.tB.z * jB;
+                    }
+                    attr.needsUpdate = true;
+                    const flicker = 0.65 + 0.35 * Math.sin(t * 8.0 + f.phase * 5.0);
+                    f.line.material.opacity = Math.min(1.0, f.baseOpacity * flicker * (0.9 + orb3d.surge * 0.7));
+                }
+            }
+
+            /**
+             * Renders the WebGL orb, driven by the same story state as the 2D overlays.
+             */
+            function renderOrb3D(cx, cy, radius, hue) {
+                if (!orb3d.ready) return;
+                const now = performance.now();
+                const dt = orb3d.lastTs ? Math.min((now - orb3d.lastTs) / 1000, 0.05) : 0.016;
+                orb3d.lastTs = now;
+
+                orb3d.simTime += dt * orb.speed;
+                orb3d.surge = orb3d.surge > 0.001 ? orb3d.surge * Math.pow(0.18, dt) : 0;
+                const t = orb3d.simTime;
+                const surge = Math.max(orb3d.surge, orb.holdLevel * 0.55);
+                const turbulence = 0.55 + orb.turbulence * 4.2;
+                const intensity = 1.1 + orb.holdLevel * 0.35;
+
+                // Story-driven color: derive the spectrum from the orb's current hue
+                const C = orb3d.colors;
+                C.deep.setHSL((((hue) % 360) + 360) % 360 / 360, 1, 0.22);
+                C.mid.setHSL((((hue) % 360) + 360) % 360 / 360, 1, 0.5);
+                C.hot.setHSL((((hue - 8) % 360) + 360) % 360 / 360, 1, 0.92);
+                C.particle.setHSL((((hue - 6) % 360) + 360) % 360 / 360, 1, 0.6);
+                orb3d.halo.material.color.copy(C.mid);
+                orb3d.wire.material.color.copy(C.mid);
+                orb3d.filaments.forEach(f => f.line.material.color.copy(f.bright ? C.hot : C.mid));
+
+                // Map world units -> pixels so the shell matches orb.baseRadius
+                const s = radius / ORB_WORLD_RADIUS;
+                const g = orb3d.group;
+                g.scale.setScalar(s);
+                g.position.set(cx - orb.width / 2, -(cy - orb.height / 2), 0);
+
+                // Slow auto-orbit plus a gentle tilt toward the pointer
+                orb3d.rotY += dt * 0.14 * orb.speed;
+                const tiltX = 0.15 + (orb.pointerActive ? (orb.pointerY - orb.cy) * 0.0012 : 0);
+                const tiltY = orb.pointerActive ? (orb.pointerX - orb.cx) * 0.0012 : 0;
+                orb3d.rotX += (tiltX - orb3d.rotX) * 0.08;
+                g.rotation.set(orb3d.rotX, orb3d.rotY + tiltY, 0);
+
+                [orb3d.inner, orb3d.outer].forEach((m, i) => {
+                    const u = m.material.uniforms;
+                    u.uTime.value = i === 0 ? t : t * 0.85 + 12.5;
+                    u.uSurge.value = surge;
+                    u.uTurbulence.value = turbulence;
+                    u.uIntensity.value = i === 0 ? intensity : intensity * 0.9;
+                });
+                orb3d.inner.rotation.set(0, t * 0.12, Math.sin(t * 0.2) * 0.15);
+                orb3d.outer.rotation.set(Math.cos(t * 0.16) * 0.18, -t * 0.09, 0);
+                orb3d.wire.rotation.set(-t * 0.04, t * 0.06, 0);
+
+                const cu = orb3d.core.material.uniforms;
+                cu.uTime.value = t; cu.uSurge.value = surge; cu.uIntensity.value = intensity;
+
+                const pu = orb3d.particles.material.uniforms;
+                pu.uTime.value = t; pu.uSurge.value = surge; pu.uIntensity.value = intensity;
+                pu.uPointScale.value = Math.max(1.2, s * 0.024) * orb3d.renderer.getPixelRatio();
+
+                const haloScale = 7.0 + Math.sin(t * 2.1) * 0.35 + surge * 1.6;
+                orb3d.halo.scale.set(haloScale, haloScale, 1);
+                orb3d.halo.material.opacity = Math.min(1.0, 0.55 + surge * 0.25);
+
+                updateFilaments3D(t, turbulence);
+                orb3d.renderer.render(orb3d.scene, orb3d.camera);
+            }
+
+            /**
              * Main animation loop.
              */
             function render() {
@@ -1570,7 +2038,11 @@
                 const radius = orb.baseRadius * (orb.scale + breathe);
                 const hue = orb.hue;
 
-                // Outer ambient glow
+                // WebGL plasma orb (drawn on its own canvas behind this one)
+                renderOrb3D(cx, cy, radius, hue);
+
+                // Outer ambient glow (2D fallback only)
+                if (!orb3d.ready) {
                 const aura = ctx.createRadialGradient(cx, cy, radius * 0.2, cx, cy, radius * 1.75);
                 aura.addColorStop(0, `hsla(${hue}, 100%, 58%, 0.34)`);
                 aura.addColorStop(0.55, `hsla(${hue + 10}, 95%, 42%, 0.12)`);
@@ -1579,6 +2051,7 @@
                 ctx.beginPath();
                 ctx.arc(cx, cy, radius * 1.75, 0, Math.PI * 2);
                 ctx.fill();
+                }
 
                 // Expanding shockwave pulses
                 for (let i = orb.pulses.length - 1; i >= 0; i--) {
@@ -1597,7 +2070,8 @@
                 drawStoryVisuals(cx, cy, radius, hue);
                 drawSiteTraffic(cx, cy, radius);
 
-                // Plasma Core & 3D Lattice
+                // Plasma Core & 3D Lattice (2D fallback when WebGL is unavailable)
+                if (!orb3d.ready) {
                 ctx.save();
                 ctx.globalCompositeOperation = 'lighter';
                 drawPlasmaLayer(cx, cy, radius * 1.02, 0.0, 0, hue + 8);
@@ -1623,6 +2097,7 @@
                 ctx.lineCap = 'round';
                 ctx.stroke();
                 ctx.restore();
+                }
 
                 requestAnimationFrame(render);
             }
@@ -1702,6 +2177,7 @@
             }
 
             window.onload = function () {
+                initOrb3D();
                 resizeCanvas();
                 initVisualGeometry();
                 syncOrbVisualStory();
