@@ -2171,10 +2171,20 @@
                 try { localStorage.setItem(MEM_KEY, JSON.stringify(memory)); } catch (e) { /* storage may be blocked */ }
             }
 
-            const evKey = (r) => 'e:' + (r.id != null ? r.id : [r.ts, normApp(r.app), r.src || '', r.action || '', r.status || '', r.ip || '', r.who || '', r.detail || ''].join('|'));
-            const upKey = (o) => 'f:' + [o.bucket, o.name, o.created_at].join('|');
-            const sendKey = (s) => 'm:' + [s.ts, normApp(s.app), s.subject || '', s.recipients || ''].join('|');
-            const alertKey = (a) => 'a:' + (a.id != null ? a.id : [normApp(a.app), a.rule, a.ts || a.created_at || ''].join('|'));
+            // Keys are hashed so no IPs, names or subjects end up in browser storage
+            const fnv = (str) => {
+                let h1 = 0x811c9dc5, h2 = 0x01000193;
+                for (let i = 0; i < str.length; i++) {
+                    const c = str.charCodeAt(i);
+                    h1 = Math.imul(h1 ^ c, 16777619);
+                    h2 = Math.imul(h2 ^ c, 2246822507);
+                }
+                return (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36);
+            };
+            const evKey = (r) => 'e:' + fnv(r.id != null ? String(r.id) : [r.ts, normApp(r.app), r.src || '', r.action || '', r.status || '', r.ip || '', r.who || '', r.detail || ''].join('|'));
+            const upKey = (o) => 'f:' + fnv([o.bucket, o.name, o.created_at].join('|'));
+            const sendKey = (s) => 'm:' + fnv([s.ts, normApp(s.app), s.subject || '', s.recipients || ''].join('|'));
+            const alertKey = (a) => 'a:' + fnv(a.id != null ? String(a.id) : [normApp(a.app), a.rule, a.ts || a.created_at || ''].join('|'));
             const seen = (k) => Object.prototype.hasOwnProperty.call(memory.keys, k);
             function remember(keys) {
                 const now = Date.now();
