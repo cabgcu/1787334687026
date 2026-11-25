@@ -115,7 +115,7 @@
             </div>
             <div id="agent-sites" class="grid grid-cols-3 sm:grid-cols-6 gap-1.5 mb-2.5"></div>
             <div id="agent-log" class="max-h-40 overflow-y-auto space-y-1 font-mono text-[11px] px-1"></div>
-            <p class="mt-2 px-1 text-[10px] text-slate-500">Reviews the real request logs, uploads and email sends of each site in turn, using built-in rules that run in this browser. It flags and explains; it never shuts a site down on its own. Tap a site to send the agent there next.</p>
+            <p class="mt-2 px-1 text-[10px] text-slate-500">Reviews each site's last 24 hours once, then only looks at new requests, uploads, email sends and alerts as they arrive. Built-in rules running in this browser. It flags and explains; it never shuts a site down on its own. Tap a site to force a full re-check.</p>
         </section>
 
         <!-- 4 Clean Focus Pills (Overview, Traffic, Brevo, Supabase) -->
@@ -1108,6 +1108,10 @@
                 orb.impactSparks = [];
                 orb.selectedSite = null;
                 orb.hoveredSite = null;
+
+                // Clearing also drops the agent's flags (what it has already reviewed stays remembered)
+                agent.verdicts = {};
+                renderAgentSites();
 
                 if (liveBadge) {
                     liveBadge.className = 'flex items-center gap-1.5 text-slate-500 font-medium';
@@ -2109,7 +2113,7 @@
                     const b = document.createElement('button');
                     b.type = 'button';
                     b.className = 'px-2.5 py-1.5 rounded-xl border text-left transition-all active:scale-95 ' + st.cls + (active ? ' ring-1 ring-sky-300/70' : '');
-                    b.title = v ? v.summary : 'Not reviewed yet — tap to review next';
+                    b.title = (v ? v.summary + ' — ' : '') + 'Tap to re-check the last 24h now';
                     const name = document.createElement('div');
                     name.className = 'text-[11px] font-medium flex items-center gap-1.5';
                     if (active) {
@@ -2120,13 +2124,13 @@
                     name.appendChild(document.createTextNode(formatSiteLabel(key)));
                     const sub = document.createElement('div');
                     sub.className = 'text-[10px] font-mono opacity-80';
-                    sub.textContent = active ? 'reviewing…' : (v ? st.label + ' · ' + agoShort(v.at) : 'queued');
+                    sub.textContent = active ? 'reviewing…' : (v ? st.label + ' · ' + agoShort(v.at) : (memory.baseline[key] ? 'up to date' : 'baseline pending'));
                     b.appendChild(name);
                     b.appendChild(sub);
                     b.addEventListener('click', () => {
                         agent.queue = agent.queue.filter(k => k !== key);
                         agent.queue.unshift(key);
-                        think('You asked me to look at ' + formatSiteLabel(key) + ' next.', 'dim');
+                        think('You asked me to re-check ' + formatSiteLabel(key) + ' next.', 'dim');
                         if (!agent.on) setAgentOn(true);
                         if (agent.wake) agent.wake();
                     });
@@ -2147,18 +2151,85 @@
                 return Array.from(keys);
             }
 
-            /** Live sites first, then sites with open alerts, then everything else in rotation. */
-            function nextSite() {
-                if (agent.queue.length) return agent.queue.shift();
-                const all = agentSiteList();
-                const live = orb.siteNodes.map(s => normApp(s.key)).filter(k => all.includes(k));
-                const alerted = (hub.alerts || []).map(a => normApp(a.app)).filter(k => all.includes(k));
-                const priority = Array.from(new Set([...live, ...alerted]));
-                const rest = all.filter(k => !priority.includes(k));
-                const order = [...priority, ...rest];
-                const key = order[agent.idx % order.length];
-                agent.idx++;
-                return key;
+            /**
+             * Memory of what the agent has already reviewed, so it never re-scans old events.
+             * Kept in localStorage (per browser) so a reload doesn't redo the baseline.
+             * keys:    event/file/email/alert keys already reviewed (pruned after ~26h)
+             * baseline: sites whose 24h baseline review is done
+             */
+            const MEM_KEY = 'cab_agent_memory_v1';
+            const memory = (() => {
+                let m = null;
+                try { m = JSON.parse(localStorage.getItem(MEM_KEY) || 'null'); } catch (e) { m = null; }
+                if (!m || typeof m !== 'object') m = {};
+                return { keys: m.keys || {}, baseline: m.baseline || {}, lastNew: m.lastNew || {} };
+            })();
+
+            function saveMemory() {
+                const cutoff = Date.now() - 26 * 3600 * 1000;
+                Object.keys(memory.keys).forEach(k => { if (memory.keys[k] < cutoff) delete memory.keys[k]; });
+                try { localStorage.setItem(MEM_KEY, JSON.stringify(memory)); } catch (e) { /* storage may be blocked */ }
+            }
+
+            const evKey = (r) => 'e:' + (r.id != null ? r.id : [r.ts, normApp(r.app), r.src || '', r.action || '', r.status || '', r.ip || '', r.who || '', r.detail || ''].join('|'));
+            const upKey = (o) => 'f:' + [o.bucket, o.name, o.created_at].join('|');
+            const sendKey = (s) => 'm:' + [s.ts, normApp(s.app), s.subject || '', s.recipients || ''].join('|');
+            const alertKey = (a) => 'a:' + (a.id != null ? a.id : [normApp(a.app), a.rule, a.ts || a.created_at || ''].join('|'));
+            const seen = (k) => Object.prototype.hasOwnProperty.call(memory.keys, k);
+            function remember(keys) {
+                const now = Date.now();
+                keys.forEach(k => { memory.keys[k] = now; });
+                saveMemory();
+            }
+
+            /** Refreshes the uploads / email-sends snapshot at most every 20s. */
+            async function ensureFiles() {
+                if (Date.now() - agent.filesAt <= 20000) return;
+                try {
+                    const f = await api('files');
+                    if (f.body && !f.body.error) { agent.filesCache = f.body; agent.filesAt = Date.now(); }
+                } catch (e) {
+                    if (e.message === 'auth') throw e;
+                }
+            }
+
+            /** Pulls the newest activity across all sites and returns only what hasn't been reviewed. */
+            async function collectNew() {
+                const r = await api('activity', { app: '', limit: 150 });
+                const activity = ((r.body && r.body.activity) || []).map(x => ({ ...x, app: normApp(x.app) }));
+                await ensureFiles();
+                const files = agent.filesCache || { objects: [], sends: [] };
+                const cleared = hub.clearedAt || 0;
+                const fresh = (ts) => { const t = new Date(ts).getTime(); return Number.isFinite(t) && t > cleared && Date.now() - t < 24 * 3600 * 1000; };
+
+                const bySite = {};
+                const bucket = (k) => (bySite[k] = bySite[k] || { events: [], uploads: [], sends: [], alerts: [] });
+                activity.forEach(e => { if (e.app && fresh(e.ts) && !seen(evKey(e))) bucket(e.app).events.push(e); });
+                (files.objects || []).forEach(o => { const k = BUCKET_APP[o.bucket]; if (k && fresh(o.created_at) && !seen(upKey(o))) bucket(k).uploads.push(o); });
+                (files.sends || []).forEach(s => { const k = normApp(s.app); if (k && fresh(s.ts) && !seen(sendKey(s))) bucket(k).sends.push(s); });
+                (hub.alerts || []).forEach(a => { const k = normApp(a.app); if (k && !seen(alertKey(a))) bucket(k).alerts.push(a); });
+                return bySite;
+            }
+
+            /** First visit to a site: one full review of its last 24 hours. */
+            async function collectBaseline(key) {
+                let events = [];
+                try {
+                    const r = await api('activity', { app: key, limit: 120 });
+                    events = ((r.body && r.body.activity) || []).map(x => ({ ...x, app: normApp(x.app) }));
+                } catch (e) {
+                    if (e.message === 'auth') throw e;
+                }
+                await ensureFiles();
+                const files = agent.filesCache || { objects: [], sends: [] };
+                const cleared = hub.clearedAt || 0;
+                const fresh = (ts) => { const t = new Date(ts).getTime(); return Number.isFinite(t) && t > cleared && Date.now() - t < 24 * 3600 * 1000; };
+                return {
+                    events: events.filter(e => fresh(e.ts)),
+                    uploads: (files.objects || []).filter(o => BUCKET_APP[o.bucket] === key && fresh(o.created_at)),
+                    sends: (files.sends || []).filter(s => normApp(s.app) === key && fresh(s.ts)),
+                    alerts: (hub.alerts || []).filter(a => normApp(a.app) === key)
+                };
             }
 
             /** Where on screen a site lives: its live node if it has one, otherwise a ghost slot. */
@@ -2178,58 +2249,54 @@
                 agent.chips.push({ text, dir, tone, t: 0, speed: 0.011 + Math.random() * 0.005, lane: 6 + Math.random() * 16 });
             }
 
-            /** Reviews one site end to end. */
-            async function reviewSite(key) {
+            /**
+             * Reviews one batch for a site. mode: 'baseline' (first look, last 24h),
+             * 'new' (only events not reviewed before) or 'recheck' (you asked for a full re-read).
+             */
+            async function reviewSite(key, batch, mode) {
                 const label = formatSiteLabel(key);
+                const { events, uploads, sends, alerts } = batch;
                 agent.site = key;
                 agent.ticker = [];
                 agent.step = 1;
                 renderAgentSites();
-                setPhase('opening', 'Opening ' + label + '…');
-                think('Opening ' + label + ' — pulling its live request log and file traffic.', 'step');
+
+                const total = events.length + uploads.length + sends.length + alerts.length;
+                if (mode === 'baseline') {
+                    setPhase('opening', 'First look at ' + label + ' — last 24h');
+                    think('First look at ' + label + ': reviewing its last 24 hours once as a baseline.', 'step');
+                } else if (mode === 'recheck') {
+                    setPhase('opening', 'Re-checking ' + label);
+                    think('Re-reading ' + label + '\'s last 24 hours because you asked.', 'step');
+                } else {
+                    setPhase('opening', total + ' new on ' + label);
+                    const since = memory.lastNew[key] ? ' since ' + new Date(memory.lastNew[key]).toLocaleTimeString([], { hour12: false }) : '';
+                    think('New activity on ' + label + since + ': ' + describeBatch(batch) + '. Reviewing just that.', 'step');
+                }
                 triggerPulse(0.55, 205);
+                await sleep(500);
+                if (!agent.on) return;
 
-                // 1. Read the real logs for this site
-                let activity = [];
-                try {
-                    const r = await api('activity', { app: key, limit: 80 });
-                    activity = (r.body && r.body.activity) || [];
-                } catch (e) {
-                    if (e.message === 'auth') return false;
-                }
-                if (Date.now() - agent.filesAt > 30000) {
-                    try {
-                        const f = await api('files');
-                        if (f.body && !f.body.error) { agent.filesCache = f.body; agent.filesAt = Date.now(); }
-                    } catch (e) { /* files are optional */ }
-                }
-                if (!agent.on) return true;
-
-                activity.forEach(r => { r.app = normApp(r.app); });
-                if (hub.clearedAt) activity = activity.filter(r => new Date(r.ts).getTime() > hub.clearedAt);
-                const files = agent.filesCache || { objects: [], sends: [], file_events: [] };
-                const uploads = (files.objects || []).filter(o => BUCKET_APP[o.bucket] === key);
-                const sends = (files.sends || []).filter(s => normApp(s.app) === key);
-
-                // 2. Walk through what is moving in and out, packet by packet
+                // Stream what is moving in and out, oldest first
                 agent.step = 2;
-                setPhase('reading', 'Reading ' + activity.length + ' events in ' + label);
-                think('Found ' + activity.length + ' recent events, ' + uploads.length + ' stored uploads, ' + sends.length + ' emails sent.', 'info');
+                setPhase('reading', mode === 'new' ? 'Reading ' + total + ' new item' + (total === 1 ? '' : 's') : 'Reading ' + events.length + ' events in ' + label);
+                if (mode !== 'new') think('Found ' + describeBatch(batch) + '.', 'info');
 
-                const stream = activity.slice(0, 14).reverse();
+                const stream = events.slice().sort((a, b) => new Date(a.ts) - new Date(b.ts)).slice(-14);
                 for (const r of stream) {
-                    if (!agent.on) return true;
+                    if (!agent.on) return;
                     const bad = r.src !== 'app log' && r.status >= 400;
                     const act = String(r.action || 'request').toLowerCase();
                     spawnChip(act.slice(0, 16), 'in', bad ? 'bad' : 'in');
                     agent.ticker.unshift({ text: sayRow(r), bad });
                     agent.ticker = agent.ticker.slice(0, 4);
+                    if (mode === 'new') think('→ ' + sayRow(r) + (r.ip ? ' (' + r.ip + ')' : '') + (bad ? ' — refused ' + r.status : ''), bad ? 'warn' : 'dim');
                     await sleep(260);
                     if (r.src !== 'app log' && r.status) spawnChip(bad ? 'refused ' + r.status : String(r.status), 'out', bad ? 'bad' : 'out');
                     await sleep(160);
                 }
                 for (const o of uploads.slice(0, 4)) {
-                    if (!agent.on) return true;
+                    if (!agent.on) return;
                     const ext = String(o.name || '').split('.').pop().slice(0, 5) || 'file';
                     spawnChip('file · ' + ext + ' ' + fmtKB(o.size), 'in', 'file');
                     agent.ticker.unshift({ text: label + ': file in — ' + (o.mime || ext) + ', ' + fmtKB(o.size), bad: false });
@@ -2237,56 +2304,83 @@
                     await sleep(320);
                 }
                 for (const s of sends.slice(0, 3)) {
-                    if (!agent.on) return true;
+                    if (!agent.on) return;
                     spawnChip('email → ' + (s.recipients || 1), 'out', 'mail');
                     agent.ticker.unshift({ text: label + ': email out' + (s.subject ? ' — "' + s.subject + '"' : ''), bad: false });
                     agent.ticker = agent.ticker.slice(0, 4);
                     await sleep(320);
                 }
 
-                // 3. Review what was seen
+                // Review only what was in this batch
                 agent.step = 3;
                 setPhase('analyzing', 'Reviewing ' + label + '…');
-                const findings = analyzeSite(key, activity, uploads, sends);
+                const findings = analyzeSite(key, batch, mode);
                 for (const f of findings) {
-                    if (!agent.on) return true;
-                    await sleep(420);
+                    if (!agent.on) return;
+                    await sleep(380);
+                    if (mode === 'new' && f.level === 'info' && /^Nothing unusual/.test(f.text)) continue;
                     think(f.text, f.level === 'concern' ? 'bad' : f.level === 'watch' ? 'warn' : 'info');
                 }
 
                 const level = findings.some(f => f.level === 'concern') ? 'concern'
                     : findings.some(f => f.level === 'watch') ? 'watch' : 'clear';
                 const headline = (findings.find(f => f.level === level) || findings[0] || { text: 'Nothing unusual.' }).text;
-                agent.verdicts[key] = { level, summary: headline, at: Date.now() };
+
+                // A flag stays up for 30 minutes even if later activity looks fine
+                const prev = agent.verdicts[key];
+                const rank = { clear: 0, watch: 1, concern: 2 };
+                const keepPrev = prev && mode === 'new' && rank[prev.level] > rank[level] && Date.now() - prev.flaggedAt < 30 * 60 * 1000;
+                agent.verdicts[key] = keepPrev
+                    ? { ...prev, at: Date.now() }
+                    : { level, summary: headline, at: Date.now(), flaggedAt: level === 'clear' ? 0 : Date.now() };
+
+                // Mark everything in this batch as reviewed so it is never scanned again
+                remember([...events.map(evKey), ...uploads.map(upKey), ...sends.map(sendKey), ...alerts.map(alertKey)]);
+                memory.baseline[key] = true;
+                memory.lastNew[key] = Date.now();
+                saveMemory();
+
                 agent.step = 4;
-                setPhase('verdict', label + ': ' + VERDICT_STYLE[level].label);
-                think('Verdict for ' + label + ': ' + VERDICT_STYLE[level].label.toUpperCase() +
-                    (level === 'concern' ? ' — tap the kill switch below if this was not you.' : ''), level === 'clear' ? 'ok' : level === 'watch' ? 'warn' : 'bad');
-                triggerPulse(level === 'clear' ? 0.6 : 1.0, VERDICT_STYLE[level].hue);
+                const shown = agent.verdicts[key].level;
+                setPhase('verdict', label + ': ' + VERDICT_STYLE[shown].label);
+                if (mode === 'new' && level === 'clear') {
+                    think(label + ': new activity looks normal' + (keepPrev ? ' (earlier ' + prev.level + ' flag still up)' : '') + '.', keepPrev ? 'warn' : 'ok');
+                } else {
+                    think('Verdict for ' + label + ': ' + VERDICT_STYLE[level].label.toUpperCase() +
+                        (level === 'concern' ? ' — tap the kill switch below if this was not you.' : ''), level === 'clear' ? 'ok' : level === 'watch' ? 'warn' : 'bad');
+                }
+                triggerPulse(level === 'clear' ? 0.5 : 1.0, VERDICT_STYLE[level].hue);
                 if (level !== 'clear') playTone(level === 'concern' ? 220 : 330, 0.3, 'sawtooth');
                 renderAgentSites();
-                await sleep(1800);
-                return true;
+                await sleep(1400);
+            }
+
+            function describeBatch(b) {
+                const parts = [];
+                if (b.events.length) parts.push(b.events.length + ' event' + (b.events.length === 1 ? '' : 's'));
+                if (b.uploads.length) parts.push(b.uploads.length + ' upload' + (b.uploads.length === 1 ? '' : 's'));
+                if (b.sends.length) parts.push(b.sends.length + ' email send' + (b.sends.length === 1 ? '' : 's'));
+                if (b.alerts.length) parts.push(b.alerts.length + ' alert' + (b.alerts.length === 1 ? '' : 's'));
+                return parts.length ? parts.join(', ') : 'nothing in the last 24h';
             }
 
             /**
-             * Rule-based review of one site's real activity. Each finding is plain English
-             * and carries a level: info | watch | concern.
+             * Rule-based review of a batch of real activity for one site. Each finding is plain
+             * English and carries a level: info | watch | concern.
              */
-            function analyzeSite(key, activity, uploads, sends) {
+            function analyzeSite(key, batch, mode) {
+                const { events: activity, uploads, sends, alerts } = batch;
                 const out = [];
                 const label = formatSiteLabel(key);
-                const now = Date.now();
                 const reqs = activity.filter(r => r.src !== 'app log');
-                const recent = activity.filter(r => now - new Date(r.ts).getTime() < 24 * 3600 * 1000);
 
-                if (!activity.length) {
-                    out.push({ level: 'info', text: 'No requests recorded for ' + label + ' yet — nothing to review.' });
+                if (!activity.length && !uploads.length && !sends.length && !alerts.length) {
+                    out.push({ level: 'info', text: 'No activity on ' + label + ' in the last 24h.' });
                     return out;
                 }
 
                 const ips = new Set(reqs.map(r => r.ip).filter(Boolean));
-                out.push({ level: 'info', text: recent.length + ' events in the last 24h from ' + ips.size + ' IP address' + (ips.size === 1 ? '' : 'es') + '.' });
+                if (activity.length && mode !== 'new') out.push({ level: 'info', text: activity.length + ' events in the last 24h from ' + ips.size + ' IP address' + (ips.size === 1 ? '' : 'es') + '.' });
 
                 // Failed sign-ins, grouped by IP
                 const failedLogins = reqs.filter(r => String(r.action).toLowerCase() === 'login' && r.status >= 400);
@@ -2303,7 +2397,7 @@
                 // Other refused requests
                 const refused = reqs.filter(r => r.status >= 400 && String(r.action).toLowerCase() !== 'login');
                 if (refused.length >= 5) out.push({ level: 'watch', text: refused.length + ' requests were refused by the server — someone may be probing.' });
-                else if (refused.length) out.push({ level: 'info', text: refused.length + ' refused request' + (refused.length === 1 ? '' : 's') + ' (normal at low volume).' });
+                else if (refused.length && mode !== 'new') out.push({ level: 'info', text: refused.length + ' refused request' + (refused.length === 1 ? '' : 's') + ' (normal at low volume).' });
 
                 // Password / access changes
                 const access = activity.filter(r => /changetoken|setadminpassword/i.test(r.action || ''));
@@ -2311,7 +2405,7 @@
 
                 // Deletions
                 const deletes = activity.filter(r => /remove|delete/i.test((r.action || '') + ' ' + (r.op || '')));
-                if (deletes.length >= 5) out.push({ level: 'watch', text: deletes.length + ' deletions in this window — more than usual.' });
+                if (deletes.length >= 5) out.push({ level: 'watch', text: deletes.length + ' deletions — more than usual.' });
                 else if (deletes.length) out.push({ level: 'info', text: deletes.length + ' deletion' + (deletes.length === 1 ? '' : 's') + ' recorded.' });
 
                 // Requests the dashboard can't explain
@@ -2319,7 +2413,7 @@
                 if (unknown.length) out.push({ level: 'watch', text: unknown.length + ' request' + (unknown.length === 1 ? '' : 's') + ' I don\'t recognise (e.g. "' + String(unknown[0].action || '').slice(0, 24) + '").' });
 
                 // Late-night activity
-                const night = recent.filter(r => { const h = new Date(r.ts).getHours(); return h >= 0 && h < 5; });
+                const night = activity.filter(r => { const h = new Date(r.ts).getHours(); return h >= 0 && h < 5; });
                 if (night.length >= 3) out.push({ level: 'watch', text: night.length + ' events between midnight and 5am.' });
 
                 // Bursts: many requests inside one minute
@@ -2331,17 +2425,15 @@
                 }
                 if (burst >= 30) out.push({ level: 'watch', text: 'Burst of ' + burst + ' requests inside one minute.' });
 
-                // Files and email moving out
-                const upl24 = uploads.filter(o => now - new Date(o.created_at).getTime() < 24 * 3600 * 1000);
-                if (upl24.length) out.push({ level: 'info', text: upl24.length + ' file' + (upl24.length === 1 ? '' : 's') + ' came in today (' + fmtKB(upl24.reduce((s, o) => s + (+o.size || 0), 0)) + ').' });
+                // Files in and email out
+                if (uploads.length) out.push({ level: 'info', text: uploads.length + ' file' + (uploads.length === 1 ? '' : 's') + ' came in (' + fmtKB(uploads.reduce((s, o) => s + (+o.size || 0), 0)) + ').' });
                 if (sends.length) {
                     const rcpt = sends.reduce((s, e) => s + (+e.recipients || 0), 0);
-                    out.push({ level: 'info', text: sends.length + ' email send' + (sends.length === 1 ? '' : 's') + ' going out' + (rcpt ? ' to ' + rcpt + ' recipients' : '') + '.' });
+                    out.push({ level: 'info', text: sends.length + ' email send' + (sends.length === 1 ? '' : 's') + ' went out' + (rcpt ? ' to ' + rcpt + ' recipients' : '') + '.' });
                 }
                 if (hub.brevo.flagged > 0 && sends.length) out.push({ level: 'concern', text: 'The email service has ' + hub.brevo.flagged + ' flagged send(s) — check what went out.' });
 
-                // Open alerts already raised by the server
-                const alerts = (hub.alerts || []).filter(a => normApp(a.app) === key);
+                // Server alerts not seen before
                 if (alerts.length) {
                     const sev = alerts.some(a => a.severity === 'high' || a.severity === 'critical');
                     out.push({ level: sev ? 'concern' : 'watch', text: alerts.length + ' open server alert' + (alerts.length === 1 ? '' : 's') + ': ' + alerts.map(a => String(a.rule || 'alert').replace(/_/g, ' ')).slice(0, 3).join(', ') + '.' });
@@ -2351,22 +2443,65 @@
                 return out;
             }
 
+            /**
+             * Main agent loop: baseline each site once, then only react to activity it hasn't
+             * reviewed yet. With nothing new it stays in a quiet "monitoring live" state.
+             */
             async function agentLoop() {
                 if (agent.running) return;
                 agent.running = true;
-                think('Agent online. I\'ll keep rotating through every site, reading real traffic and flagging anything odd.', 'step');
+                think('Agent online. Each site gets one 24h baseline review; after that I only look at new activity as it arrives.', 'step');
+                let quietSince = 0;
                 while (agent.on && token) {
                     if (document.hidden || !hub.loaded) { await sleep(1500); continue; }
-                    const key = nextSite();
-                    if (!key) { await sleep(3000); continue; }
-                    const ok = await reviewSite(key);
-                    if (ok === false) break;
+                    try {
+                        // 1. Something you asked for
+                        if (agent.queue.length) {
+                            const key = agent.queue.shift();
+                            const batch = await collectBaseline(key);
+                            await reviewSite(key, batch, 'recheck');
+                            quietSince = 0;
+                            continue;
+                        }
+
+                        // 2. Baseline any site never reviewed before
+                        const pending = agentSiteList().filter(k => !memory.baseline[k]);
+                        if (pending.length) {
+                            const key = pending[0];
+                            const batch = await collectBaseline(key);
+                            await reviewSite(key, batch, 'baseline');
+                            quietSince = 0;
+                            continue;
+                        }
+
+                        // 3. Live monitoring: only new, unreviewed activity
+                        const bySite = await collectNew();
+                        const keys = Object.keys(bySite).filter(k => {
+                            const b = bySite[k];
+                            return b.events.length + b.uploads.length + b.sends.length + b.alerts.length > 0;
+                        });
+                        if (keys.length) {
+                            // Busiest / most alarming first
+                            keys.sort((a, b) => (bySite[b].alerts.length - bySite[a].alerts.length) || (bySite[b].events.length - bySite[a].events.length));
+                            for (const key of keys) {
+                                if (!agent.on) break;
+                                await reviewSite(key, bySite[key], 'new');
+                            }
+                            quietSince = 0;
+                        } else {
+                            agent.site = null;
+                            agent.ticker = [];
+                            if (!quietSince) quietSince = Date.now();
+                            renderAgentSites();
+                            setPhase('idle', 'Monitoring live · nothing new · checked ' + clock());
+                        }
+                    } catch (e) {
+                        if (e && e.message === 'auth') break;
+                    }
                     agent.site = null;
                     agent.ticker = [];
-                    renderAgentSites();
                     if (!agent.on) break;
-                    setPhase('idle', 'Watching live traffic…');
-                    await sleep(2200);
+                    await sleep(6000);
                 }
                 agent.site = null;
                 agent.running = false;
