@@ -202,6 +202,7 @@
           <span id="in-status" class="ml-auto text-[10px] font-mono text-slate-500"></span>
         </div>
         <div id="in-activity">
+          <div id="in-guard" class="mb-3 rounded-lg border border-zinc-800 p-2 text-[12px]"></div>
           <div id="in-apps" class="flex flex-wrap gap-1.5 mb-2"></div>
           <div id="in-act-list" class="max-h-96 overflow-y-auto space-y-1 text-[12px]"></div>
           <p class="mt-2 text-[10px] text-slate-500">Shows what reaches the servers: sign-ins, page loads, saves, uploads, emails, plus each app's own activity log (marketing and timesheet name the person). Clicks that stay inside the browser never reach a server and are not visible. Commuter, VIP, receipts and portal requests do not record who did it, only the action, time and IP.</p>
@@ -2968,8 +2969,24 @@
     d.appendChild(el('span','text-slate-600 font-mono text-[10px]',m.join(' · ')));
     return d;
   }
+  async function loadGuard(){
+    var g=await call('guard'); var G=$('in-guard'); if(!g||!G)return; G.textContent='';
+    G.appendChild(el('div','text-[11px] uppercase tracking-wider text-slate-400 mb-1','AI guard - first line of defense (checks new activity every 2 minutes)'));
+    var C={benign:'text-emerald-300',suspicious:'text-amber-300',likely_attack:'text-red-400',unreviewed:'text-amber-300'};
+    var L={benign:'Looks normal',suspicious:'Looks odd',likely_attack:'Likely attack',unreviewed:'Not reviewed by AI'};
+    var keys=Object.keys(g.latest||{});
+    if(!keys.length)G.appendChild(el('div','text-slate-500','No new activity reviewed yet.'));
+    keys.forEach(function(k){var v=g.latest[k];var d=el('div','flex flex-wrap items-baseline gap-x-2');
+      d.appendChild(el('span','text-slate-500 font-mono text-[10px] w-16 shrink-0',ago(v.ts)));
+      d.appendChild(el('span','text-slate-300 w-20',app(k)));
+      d.appendChild(el('span',C[v.verdict]||'text-slate-300',L[v.verdict]||v.verdict));
+      d.appendChild(el('span','text-slate-500 text-[11px]',(v.mode==='rules'?'routine, no AI needed':v.mode==='model'?'reviewed by AI':'')+(v.reason&&v.mode!=='rules'?' - '+v.reason:'')));
+      G.appendChild(d)});
+    G.appendChild(el('div','mt-1 text-[10px] text-slate-600','AI calls today: '+(g.calls_today||0)+'. The guard only raises alerts; it never shuts anything down by itself.'));
+  }
   async function loadActivity(){
-    var j=await call('activity',{app:appF,limit:150}); if(!j)return;
+
+    loadGuard();    var j=await call('activity',{app:appF,limit:150}); if(!j)return;
     var bar=$('in-apps'); bar.textContent='';
     ['','marketing','commuter','vip','receipts','portal','timesheet'].forEach(function(k){
       var b=el('button','px-2 py-0.5 rounded-md text-[11px] border '+(k===appF?'border-sky-400 text-sky-200':'border-zinc-700 text-slate-400'),k?app(k):'All sites');
